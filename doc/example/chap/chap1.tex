@@ -26,6 +26,24 @@ NIST 将云计算分为了三种服务模型。
 
 云计算发展至今日，其服务模型已经不严格局限于NIST最初总结的这三种基本形态，世界各地各领域的研究者们已经提出了众多不同的X as a Service，包括Blockchain as a Service，Sensing as a Service，Workspace as a Service等。与传统的三种服务形态相比，这些服务不单纯是硬件服务或者软件服务，其结合二者的特点，面向特定的领域方向进行更深度的定制，如区块链、物联网、分布式共识等。服务形态的日益丰富，服务内容的日益复杂体现了云计算更见领域化，精细化的发展趋势。而近几年来最热门的概念莫过于FaaS，即Fucntion as a Service。
 
-FaaS是一种新兴的计算模式，亦被称为Serverless Computing。
+FaaS是一种新兴的计算模式，亦被称为Serverless Computing。从字面理解，Serverless Computing即为“无服务器计算”之意。然后，其并非意味着真的没有服务器，而已说开发者不用过多考虑服务器的相关问题。在传统的IaaS服务中，开发者需要自己惊醒服务器管理与运维，负责服务的发布，在流量变化时对服务器集群进行扩容或缩容。而在FaaS中，开发者只需要关注业务逻辑，至于服务的发布、管理、弹性伸缩等，则交由云厂商来完成。
 
+FaaS背后的机制一般是以容器技术为基础的。典型地，开发者上传自己的业务代码后，云厂商并不会直接收费。当对该服务的请求到来之时，云厂商将启动一系列容器来运行该服务，从而对用户的请求进行响应。通常而言，开发者指定的服务会与某些时间绑定（hook），在发生该事件时，立即触发开发者定义的服务。我们以AWS的serverless computing服务Lambda中的一个示例程序为例，讲述整个流程。图\ref{aws_resize}所示的是一个为照片调整大小的服务。该服务与AWS S3（AWS的对象存储服务）的上传事件绑定，当云厂商检测到有用户向S3上传图片时，会立即触发开发者定义的图片大小调整函数。整个流程中，开发者需要关注的只有第四步的函数开发工作，至于该函数的横向拓展，全部由云厂商来负责。
+
+\begin{figure}
+    \centerline{\includegraphics[width=\textwidth]{figures/aws-lambda-resize.png}}
+    \caption{AWS Lambda中示例程序：照片大小调整}
+    \label{aws_resize}
+\end{figure}
+
+主流的云厂商均提供了FaaS服务，例如AWS的Lambda，阿里云的函数计算等，近年来越来越受到开发者的青睐。一方面是因为它的高弹性，易于开发。另一方面则是因为其细粒度的收费模式。通常而言，FaaS的服务是按照请求次数进行收费。当函数闲置时，并不产生额外的费用。
+
+\section{人工智能技术近年的发展}
+
+
+
+\section{云计算和人工智能交叉领域的常见研究问题}
+
+\subsection{}
+\subsection{}
 % vim:ts=4:sw=4
