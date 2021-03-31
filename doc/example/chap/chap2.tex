@@ -11,23 +11,28 @@
 
 \section{一站式的云上机器学习系统}
 
-\textbf{AWS Sagemaker}
+\subsection{AWS Sagemaker}
+AWS作为公有云领域的龙头老大，在云计算的前沿技术领域一直处于领先的地位。其某些代表性技术甚至成为了多数公有云厂商所共识的标杆和规范。在机器学习系统这一分领域，其代表性系统为AWS Sagemaker。
 
-\textbf{阿里云Max Compute}
+Sagemaker是一个实现和产品化机器学习模型的框架\parencite{joshi2020amazon}，用户可以将其模型训练需要的数据存储到AWS的对象存储服务S3中。然后，用户可以通过web的方式访问部署在云端的Jupyter Notebook服务，在线访问数据、编写并调试代码。当模型训练完毕后，可以使用Sagamaker内置的推理服务对模型进行发布。用户在发布时还可以根据平台的不同（云端或边缘节点）将模型打包编译成不同的版本。此外，Sagamaker还内置了一些常用的算法和数据集，方便开发者直接调用。
+
+
+
+\subsection{阿里云Max Compute}
 
 \section{基于公有云服务的模型训练系统}
 
-\textbf{基于云厂商动态资源的模型训练系统}
+\subsection{基于云厂商动态资源的模型训练系统}
 % harlap的第一篇工作
 
-\textbf{基于云厂商动态资源的自动调参系统}
+\subsection{基于云厂商动态资源的自动调参系统}
 % SpotTune
 
 \section{基于多种服务模式的模型部署系统}
 
-\textbf{基于多种资源混用的模型部署系统}
+\subsection{基于多种资源混用的模型部署系统}
 % MArk
 
-\textbf{基于FaaS的模型部署系统}
+\subsection{基于FaaS的模型部署系统}
 %一系列FaaS for ML serving的工作，INFaaS etc
 % vim:ts=4:sw=4
