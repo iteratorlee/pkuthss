@@ -16,7 +16,11 @@ AWS作为公有云领域的龙头老大，在云计算的前沿技术领域一�
 
 Sagemaker是一个实现和产品化机器学习模型的框架\parencite{joshi2020amazon}，用户可以将其模型训练需要的数据存储到AWS的对象存储服务S3中。然后，用户可以通过web的方式访问部署在云端的Jupyter Notebook服务，在线访问数据、编写并调试代码。当模型训练完毕后，可以使用Sagamaker内置的推理服务对模型进行发布。用户在发布时还可以根据平台的不同（云端或边缘节点）将模型打包编译成不同的版本。此外，Sagamaker还内置了一些常用的算法和数据集，方便开发者直接调用。
 
+在训练算法和系统机制方面，Sagemaker旨在解决工业规模的模型训练场景中的如下几个常见问题：
 
+\begin{itemize}
+    \item \textbf{支持增量式的训练和模型更新}。
+\end{itemize}
 
 \subsection{阿里云Max Compute}
 
