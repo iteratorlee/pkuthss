@@ -26,6 +26,21 @@ Sagemaker是一个实现和产品化机器学习模型的框架\parencite{joshi2
     \item \textbf{支持自动调参。}自动调参是一项非常耗时耗力的工作，特别是在生产环境的大数据集下。因此，如何能够支持高效的自动调参，方便用户选取合适的模型，对于云上的ML系统而言也是非常重要的。
 \end{itemize}
 
+下面将从计算模型、支持算法和具体的实现方式介绍Sagemaker如何解决上述问题。
+
+\subsubsection{计算模型}
+Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，update和finalize。initialize阶段：对相关的变量进行初始化。update阶段：
+
+图\ref{sage_cmp_mdl}用伪代码的形式讲述了三个阶段的具体流程。这里以计算一列数据的中位数为例，使用随机梯度下降（SGD）进行求解。对于如下一列数据：$x_1, x_2, x_3, ..., x_n$，则由如下公式给出这一列数据的中位数：$\operatorname{argmin}_z\Sigma_{i=1}^n||x_i-z||$。
+
+\begin{figure}
+    \centerline{\includegraphics[width=\textwidth]{figures/compute-model.png}}
+    \caption{Sagemaker计算模型}
+    \label{sage_cmp_mdl}
+\end{figure}
+
+\subsubsection{支持算法}
+\subsubsection{实现方式}
 
 \subsection{阿里云Max Compute}
 
@@ -43,5 +58,6 @@ Sagemaker是一个实现和产品化机器学习模型的框架\parencite{joshi2
 % MArk
 
 \subsection{基于FaaS的模型部署系统}
+
 %一系列FaaS for ML serving的工作，INFaaS etc
 % vim:ts=4:sw=4
