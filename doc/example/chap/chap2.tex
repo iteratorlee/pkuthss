@@ -11,8 +11,10 @@
 
 \section{一站式的云上机器学习系统}
 
+本节先以AWS Sagemaker为代表，介绍公有云厂商一站式的云上机器学习系统。其它厂商中类似系统中对计算模型的抽象、使用方式等均与Sagemaker大同小异。
+
 \subsection{AWS Sagemaker}
-AWS作为公有云领域的龙头老大，在云计算的前沿技术领域一直处于领先的地位。其某些代表性技术甚至成为了多数公有云厂商所共识的标杆和规范。在机器学习系统这一分领域，其代表性系统为AWS Sagemaker。
+AWS作为公有云领域的先驱者，在云计算的前沿技术领域一直处于领先的地位。其某些代表性技术甚至成为了多数公有云厂商所共识的标杆和规范。在机器学习系统这一分领域，其代表性系统为AWS Sagemaker。
 
 Sagemaker是一个实现和产品化机器学习模型的框架\parencite{joshi2020amazon}，用户可以将其模型训练需要的数据存储到AWS的对象存储服务S3中。然后，用户可以通过web的方式访问部署在云端的Jupyter Notebook服务，在线访问数据、编写并调试代码。当模型训练完毕后，可以使用Sagamaker内置的推理服务对模型进行发布。用户在发布时还可以根据平台的不同（云端或边缘节点）将模型打包编译成不同的版本。此外，Sagamaker还内置了一些常用的算法和数据集，方便开发者直接调用。
 
@@ -29,9 +31,9 @@ Sagemaker是一个实现和产品化机器学习模型的框架\parencite{joshi2
 下面将从计算模型、支持算法和具体的实现方式介绍Sagemaker如何解决上述问题。
 
 \subsubsection{计算模型}
-Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，update和finalize。initialize阶段：对相关的变量进行初始化。update阶段：
+Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，update和finalize。initialize阶段：对相关的变量进行初始化。update阶段：系统以数据流及其状态作为输入，根据用户编写算法更新状态。在Sagemaker的后台，状态更新是在多台计算节点上同步执行的。finalize阶段：对之前所有的更新进行汇总，并输出最后的结果（对于机器学习任务而言，一般是一个模型）。通过上述抽象，用户只需编写initialize、update和finalize三个函数，就可以将整个训练过程交由Sagemaker，等待最后的模型输出。
 
-图\ref{sage_cmp_mdl}用伪代码的形式讲述了三个阶段的具体流程。这里以计算一列数据的中位数为例，使用随机梯度下降（SGD）进行求解。对于如下一列数据：$x_1, x_2, x_3, ..., x_n$，则由如下公式给出这一列数据的中位数：$\operatorname{argmin}_z\Sigma_{i=1}^n||x_i-z||$。
+图\ref{sage_cmp_mdl}用伪代码的形式讲述了三个阶段的具体流程。这里以计算一列数据的中位数为例，使用随机梯度下降（SGD）进行求解。对于如下一列数据：$x_1, x_2, x_3, ..., x_n$，则由如下公式给出这一列数据的中位数：$\operatorname{argmin}_z\Sigma_{i=1}^n||x_i-z||$。算法中的initialize函数首先对median和n两个参数做初始化。这里\textit{state}可以理解为一个key-value存储结构。在update阶段，函数将接收到的数据流\textit{data\_stream}分为若干mini\_batch，对每个batch没的数据，迭代式的对median值进行更新，同时更新n的值。最后，在finalize函数中，对最终的median值进行汇总。同时，系统还支持用户在算法的任意位置设置barrier（第15行），以对整个训练过程进行同步操作。
 
 \begin{figure}
     \centerline{\includegraphics[width=\textwidth]{figures/compute-model.png}}
@@ -42,20 +44,23 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
 \subsubsection{支持算法}
 \subsubsection{实现方式}
 
-\subsection{阿里云Max Compute}
+\subsection{其它厂商的相关系统简介}
 
 \section{基于公有云服务的模型训练系统}
-
+尽管公有云厂商实现了相当完备的一站式机器学习系统
 \subsection{基于云厂商动态资源的模型训练系统}
 % harlap的第一篇工作
 
 \subsection{基于云厂商动态资源的自动调参系统}
 % SpotTune
 
-\section{基于多种服务模式的模型部署系统}
+\section{基于公有云服务的模型部署系统}
 
 \subsection{基于多种资源混用的模型部署系统}
 % MArk
+
+\subsection{基于云厂商动态资源的服务部署系统}
+% Tributary
 
 \subsection{基于FaaS的模型部署系统}
 
