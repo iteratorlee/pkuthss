@@ -33,13 +33,43 @@ Sagemaker是一个实现和产品化机器学习模型的框架\parencite{joshi2
 \subsubsection{计算模型}
 Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，update和finalize。initialize阶段：对相关的变量进行初始化。update阶段：系统以数据流及其状态作为输入，根据用户编写算法更新状态。在Sagemaker的后台，状态更新是在多台计算节点上同步执行的。finalize阶段：对之前所有的更新进行汇总，并输出最后的结果（对于机器学习任务而言，一般是一个模型）。通过上述抽象，用户只需编写initialize、update和finalize三个函数，就可以将整个训练过程交由Sagemaker，等待最后的模型输出。
 
-图\ref{sage_cmp_mdl}用伪代码的形式讲述了三个阶段的具体流程。这里以计算一列数据的中位数为例，使用随机梯度下降（SGD）进行求解。对于如下一列数据：$x_1, x_2, x_3, ..., x_n$，则由如下公式给出这一列数据的中位数：$\operatorname{argmin}_z\Sigma_{i=1}^n||x_i-z||$。算法中的initialize函数首先对median和n两个参数做初始化。这里\textit{state}可以理解为一个key-value存储结构。在update阶段，函数将接收到的数据流\textit{data\_stream}分为若干mini\_batch，对每个batch没的数据，迭代式的对median值进行更新，同时更新n的值。最后，在finalize函数中，对最终的median值进行汇总。同时，系统还支持用户在算法的任意位置设置barrier（第15行），以对整个训练过程进行同步操作。
+算法~\ref{algo_sagemaker}用伪代码的形式讲述了三个阶段的具体流程。这里以计算一列数据的中位数为例，使用随机梯度下降（SGD）进行求解。对于如下一列数据：$x_1, x_2, x_3, ..., x_n$，则由如下公式给出这一列数据的中位数：$\operatorname{argmin}_z\Sigma_{i=1}^n||x_i-z||$。算法中的initialize函数首先对median和n两个参数做初始化。这里\textit{state}可以理解为一个key-value存储结构。在update阶段，函数将接收到的数据流\textit{data\_stream}分为若干mini\_batch，对每个batch没的数据，迭代式的对median值进行更新，同时更新n的值。最后，在finalize函数中，对最终的median值进行汇总。同时，系统还支持用户在算法的任意位置设置barrier（第15行），以对整个训练过程进行同步操作。
 
-\begin{figure}
-    \centerline{\includegraphics[width=\textwidth]{figures/compute-model.png}}
+\begin{algorithm}
     \caption{Sagemaker计算模型}
-    \label{sage_cmp_mdl}
-\end{figure}
+    \label{algo_sagemaker}
+    \begin{algorithmic}[1] 
+        \Function{initialize}{$state$}
+        \State $state.initialize('median', 0)$
+        \State $state.initialize('n', 0)$
+        \EndFunction
+        \State
+        \Function{update}{$state, data\_stream, synchronized$}
+        \For {$mini\_batch \in data\_stream$}
+        \State $current\_median \gets state.pull('median')$
+        \State $n \gets state.pull('n')$
+        \State $inc \gets 0$
+        \State $batch\_size \gets 0$
+        \For {$item \in mini\_batch$}
+        \If {$item > current\_median$}
+        \State $inc += 1$
+        \Else
+        \State $inc -= 1$
+        \EndIf
+        \EndFor
+        \State $state.push('n', batch\_size)$
+        \State $state.push('median', inc / sqrt(n + batch\_size))$
+        \If {$synchronized$}
+        \State $state.barrier()$
+        \EndIf
+        \EndFor
+        \EndFunction
+        \State
+        \Function{finalize}{$state$}
+        \State \Return{$state.pull('median')$}
+        \EndFunction
+    \end{algorithmic}
+\end{algorithm}
 
 \subsubsection{支持算法}
 \subsubsection{实现方式}
@@ -55,9 +85,27 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
 
 除了上述可训练的参数之外，还存在大量不可训练的参数。例如，SVM模型中核函数的类型，树模型中树的深度，深度神经网络模型中网络的宽度和深度等。这些参数需要由开发者在训练之前事先决定，一般被称为超参数。不同的参数组合在一起，就构成了巨大的搜索空间。例如，如果存在6个超参数，每个超参数有4种不同的选择，就会产生$4^6=4096$种不同的超参数组合。
 
-遍历所有的超参数组合是非常费时费力的，通常情况下也是不切实际的。研究者为了减少超参数搜索的此时，提出了诸如网格搜索、贝叶斯搜索等技术。但即便如此，仍然需要大量的算力来支撑整个搜索过程。
+完全遍历所有的超参数组合是非常费时费力的，通常情况下也是不切实际的。研究者为了减少超参数搜索的此时，提出了诸如网格搜索、贝叶斯搜索等技术。但即便如此，仍然需要大量的算力来支撑整个搜索过程。
 
 而与此同时，在云计算时代，云上资源的易用性、高度的弹性以及收费模式的多样性使得以较低的成本完成费时费力的模型训练和超参数搜索变为可能。如上一小节所述，一些云厂商提供了一些价格低廉的动态资源。和一般的可以获得可用性保障的资源相比，这类资源拥有相同的计算能力，但是可用性比较低，在某些场合会被云厂商主动回收。基于上述事实，可以形成一个直观的想法：在这类廉价的资源上运行机器学习模型训练和调参任务，并辅以一定的容错策略和资源选择策略，可以显著降低成本。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/hpt.pdf}}
+    \caption{一个超参数调整的例子。}
+    \label{hpt_example}
+\end{figure}
+
+但是，在动态资源上运行机器学习模型训练和调参，虽然直觉上会降低成本，但是可能会产生额外的风险。因此，要做到高效并可靠地在动态资源上运行上述作业，还有如下若干问题需要解决：
+
+\textbf{1. 及时处理中断。}动态资源之所以廉价，是因为其稳定性比较低。通常情况下，在某些特殊情况下（例如集群中的负载比较高，需要动态资源来补充资源池），云厂商有权利主动回收这些动态资源。如果不处理这种回收引起的中断，机器学习模型的训练就要被动终止。因此需要采取一些手段，例如提前保存模型或者迁移任务，以及时处理中断。
+
+\textbf{2. 合理的资源选取算法。}事实上，这是在云上运行任务时需要考虑的一个通用问题。用户在云上运行作业时，一般会有一个目标，例如作业运行时间最短或者最终的总体成本最低。因此需要通过一定的算法，为用户选取能满足其需求的资源。对于机器学习模型训练与调参任务亦是如此。
+
+\textbf{3. 充分利用云的弹性。}事实上，在机器学习模型训练过程中，存在大量的无效计算。如图~\ref{hpt_example}所示，经过大量的参数尝试，最终只剩余一个有效模型（即效果最好的模型）。因此，在参数搜索的过程中，大量的计算是无效计算。而云计算的一个重要特点就是高弹性，即用户可以因为负载增加随时获取资源，也可以因为资源闲置随时释放资源。如果效果不好的模型能够被提前发现，并释放掉其占用的计算资源，则可以避免大量无效计算，从而进一步节省成本。
+
+\textbf{4. 对计算框架进行定制。}现有的流行的机器学习框架如Tensorflow，PyTorch，MXnet等，一般都假设底层的计算资源是可靠的，因此都没有针对上述动态资源进行适配。如果要在动态资源上运行ML任务，则需要对框架进行深度定制，使其具备一定的容错能力。
+
+为了解决上述问题，使ML模型训练和调参都可以在云上经济高效地进行，许多研究者提出了若干解决方案。A. Harlap等人在2017年提出了ML模型训练系统Proteus\parencite{harlap2017proteus}，针对Parameter Server架构的ML模型训练框架对AWS和Google Cloud的动态资源做了适配，使其能高效经济地在之上运行；Y. Li等人在2020年提出了SpotTune\parencite{li2020spottune}，将ML调参任务部署在AWS动态资源上，并结合一定的资源选取算法和训练趋势预测算法，使调参任务节省大量的无效计算，最终达到了经济高效的目的。下文对较有代表性的Proteus和SpotTune做详细介绍。
 
 \subsection{基于FaaS的模型训练系统}
 %infocom 19
