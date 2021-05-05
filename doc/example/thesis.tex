@@ -27,11 +27,14 @@
 \usepackage{algorithm}
 \usepackage{algorithmicx}
 \usepackage[noend]{algpseudocode}
+\usepackage{diagbox}
 
 % 对于 linespread 值的计算过程有兴趣的同学可以参考 pkuthss.cls。
 \renewcommand*{\bibfont}{\zihao{5}\linespread{1.27}\selectfont}
 % 按学校要求设定参考文献列表的段间距。
 \setlength{\bibitemsep}{3bp}
+
+\newcommand{\tabincell}[2]{\begin{tabular}{@{}#1@{}}#2\end{tabular}}
 
 % 如是双盲版论文，将 \blindfalse 改为 \blindtrue。后面可用
 % \ifblind 根据是否双盲来条件地启用代码（参见本文件后面部分）。
