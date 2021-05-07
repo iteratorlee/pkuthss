@@ -173,12 +173,124 @@ Proteus是一个基于Parameter-Server（下文简称为PS）架构的机器学�
 
 其中，AgileML是负责协调整个PS架构的主要组件。其通过如下的基本思想，在保证整个系统可用性的前提下，尽可能多使用动态资源（即AWS Spot Instances）以降低成本：1）将PS的关键功能节点（即保存模型参数的server节点）部署在可靠资源上（如AWS的按需实例或者预留实例）；2）将PS的worker节点（即负责实际计算和参数更新的节点）部署在动态资源；3）当动态资源和可靠资源的比例不同时，AgileML会采取不同的策略。具体地，当比例比较小时（例如2:1），其简单地将server节点分布在所有的可靠资源上，而当比例比较大的时候（例如63:1），其将可靠资源作为BackupPSs而将动态资源作为ActivePSs，当发生参数更新时，更新会先到达ActivePSs。同时，在网络带宽允许的前提下，ActivePSs上会启动相应的后台任务将参数同步到BackupPSs上。
 
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/agileml-stages.png}}
+    \caption{AgileML架构中的三个阶段。Stage 1:只存在部署在可靠资源上的ParamServs。Stage 2:ActivePSs部署在动态资源上，BackupPSs部署在可靠资源上。Stage 3:所有的ActivePSs都部署在动态资源上，可靠资源上没有worker。}
+    \label{agileml_stages}
+\end{figure}
+
 BidBrain是Proteus中的资源管理模块，决定何时获取和释放动态资源。据文中所描述，BidBrain是专为AWS EC2定制的，但是其经过少量的修改和定制化也可以适用于其它环境（如私有集群和其它公有云市场）。其秩序性地监控云市场中动态资源的价格，并即时地竞标那些可能给当前计算带来增益的资源（文中通过 work per dollar来衡量增益，即单位花费可以完成的工作量）。类似地，当一种资源在达到其第一个小时的末端时，就有可能因为性价比降低而被释放掉。另外BidBrain还利用了AWS EC2的一项特殊规则：当资源在其第一个小时内被释放时，其所有花费会被退回。因此其也会主动获取那些在接下来的一小时内会被释放掉的资源，以进一步降低整个成本，此种策略被作者成为激进的竞标策略。总体而言，BidBrain会在激进的竞标策略和保守策略之间权衡，以寻求整个系统的收益最大化。
 
+AgileML的具体功能和技术特点，下文通过一个示例来说明。图~\ref{agileml_stages}描述了AgileML架构中的三个阶段，分别对应不同的资源类型比例。
 
+\textbf{Stage 1:参数服务器仅位于可靠节点上。}此阶段为整个ML训练过程的启动阶段。对于大多数ML的应用程序而言（例如K-means，DNN，Logistic Regression，MF，LDA等），其在PS模型的场景下worker节点是无状态的，其当前轮次更新的参数数据会push到server节点进行持久化存储。因此，在启动时，AgileML会将所有的server节点部署到可靠资源上，而将所有的worker节点部署到动态资源上。在这种情形下，当worker因为云厂商的主动回收而宕机时，整个训练过程并不会受到影响，也不需要进行checkpointing。但是在模式下，当动态资源与可靠资源相比比例过于悬殊时，网络会成为瓶颈。例如当存在60个动态节点和4个可靠节点时，MF的训练速度会下降85%。
+
+\textbf{Stage 2:ActivePSs部署在动态节点上，BackupPSs部署在可靠节点上。}为了解决Stage 1中的网络瓶颈问题，Stage 2中将server节点分为ActivePS和BackupPS两种，其中ActivePS分布在动态资源上，BackupPS分布在可靠资源上。这种策略合理控制了server节点和worker节点的比例，解决了网络的瓶颈问题。所有的参数在ActivePS内部是共享的，并且在后台批量地push到BackupPS上，因此当ActivePS因厂商主动回收而宕机时，BackupPS可以恢复其相关状态，并启动新的动态节点。需要注意的是，在Stage 2中，计算节点，即worker，仍然存在于ActivePS上。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/stage-trans.png}}
+    \caption{AgileML动态地添加并删除资源。}
+    \label{stage_trans}
+\end{figure}
+
+\textbf{Stage 3:所有的计算节点，即worker都位于动态节点上。}实验证明，当动态资源和可靠资源的比例超过15:1时，和BackupPS共同部署的worker会造成“落后者效应”（即Straggler Effect）。因此，Stage 3中简单地移除了所有位于BackupPS中的worker。何时由Stage 2转移到Stage 3，依赖于网络带宽，动态资源和可靠资源地比例以及ML模型的大小等等。
+
+上述三个stage之间的转移一般是由AgileML根据动态资源和可靠资源之间的比例动态决定的。当发生阶段转移时，AgileML会根据实际情况做出相应的动作。例如，当从Stage 1转移到Stage 2时，AgileML会将模型的状态（一般是模型的参数）转移到新增的动态资源上，当动态资源和可靠资源的比例超过一个阈值时，AgileML会将相应的worker在BackupPS上删除，并将相关的训练数据重新分布到其余worker上。图~\ref{stage_trans}所示的是一个stage转移的示例。
+
+BidBrain是Proteus中的资源管理模块，决定何时获取和释放动态资源。其持续性地监控当前和历史的动态资源价格数据，并在相关的时刻根据预测出的花费做出决策，选择当前最优的资源加如动态资源池。简而言之，其资源选取策略较为激进，会考虑那些在未来一个小时就会被回收的Spot Instances，以获取相应的退款，进而进一步降低使用成本。其细节策略与相关的公式推导本文不再赘述。图~\ref{bidbrain_phase}描述了一个BidBrain决策选取何种资源加入资源池的示例。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/bidbrain-phase.png}}
+    \caption{BidBrain根据预期花费决定选取何种资源。}
+    \label{bidbrain_phase}
+\end{figure}
+
+总体而言，Proteus运用了激进的资源选取策略，将动态资源和可靠资源相结合，进行云上的ML模型训练。经过其实验验证，与仅使用可靠资源相比，Proteus可以实现约85\%的成本节省，和一般的基于checkpoint的云上ML训练系统相比，其效率约可以提升50\%。
+
+与单个模型的训练相比，模型的超参数调整（Hyper-parameter Tuning，下文简称为HPT）在整个ML模型产出周期中位于更上一层。其一般需要开发者尝试模型的多个超参数组合，以得出最优的一个。SpotTune是一个云上自动调参管理系统，通过运用公有云上廉价的动态资源来协调整个HPT过程。据文中所述，SpotTune同样是基于AWS的公有云服务实现的，但是经过一定程度的修改和定制，其可以应用与其它云厂商。为了妥善处理因厂商主动回收产生的中断，SpotTune根据厂商提前发出的通知事先对模型进行checkpoint并将其保存到持久化对象存储中。同时其运用了两个关键技术来保证HPT的经济高效：
+
+\textbf{1. 基于花费的细粒度资源管理。}SpotTune计算花费的粒度非常细。其通过预测动态资源的回收概率和在线对HPT任务进行性能建模，预测出接下来一小时内“单步成本”最低的资源并进行任务部署。
+
+\textbf{2. 基于训练趋势预测的早停机制。}SpotTune将ML模型的训练曲线建模为一个可以预测的、多阶段的函数。简而言之，其可以通过当前时刻收集到的关于模型的质量信息（通常是模型的score函数所得出的结果，例如分类模型的分类准确率，回归模型的平均平方误差等等）来预测该模型在最终收敛时的质量，以提前结束那些劣质模型，节省计算资源。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/arch_spottune.pdf}}
+    \caption{SpotTune系统架构。}
+    \label{arch_spottune}
+\end{figure}
+
+SpotTune的系统架构如图~\ref{arch_spottune}所示。其主要功能模块包含Provisioner和Orchestrator两部分。其中\textbf{Provisioner}负责与AWS互动以请求和获取资源。通过结合历史数据和在线更新的性能数据，Provisioner可以细粒度地预测每种资源带来地收益，进而选择最适合HPT任务的资源。\textbf{Orchestrator}负责监控每个超参数组合的训练进度。通过当前收集到的模型质量数据，其可以预测模型的最终质量。Orchestrator一直监听AWS市场的消息，当收到回收提醒时，其会立即将模型checkpoint到持久化存储系统AWS S3中。另一方面，SpotTune认为运行超过一小时的实例性价比是比较低的，在没有特殊情况出现时，Orchestrator会主动将其停止。
+
+SpotTune之所以能做到经济高效，是由Provisioner和Orchestrator中的RevPred模型和EarlyCurve模型决定的。其中RevPred通利用历史数据预测每一种动态资源在将来一小时内被回收的概率，进而用该概率结合在线更新的性能数据预测每一种资源在将来一段时间的效率，其量纲为“\$每步”。具体计算过程如下：
+
+\textbf{1. 计算每种资源在接下来一小时内单价的数学期望。}公式~\ref{eq_ecost}给出了计算方法。公式中的参数$p$为该示例在一小时内被回收的概率。如果该资源被回收（概率对应为p），则价格为零，因为AWS会将该部分费用全数退回给用户。如果该资源没有被回收（对应概率为$1-p$），则按照当前单价收费。
+
+\begin{equation}\label{eq_ecost}
+	\begin{aligned}
+		\mathbb{E}\left[eCost\right] &= [(1-p) \cdot \overline{price} + p \cdot 0] \cdot 1\ hour \\
+		&= (1-p) \cdot \overline{price} \cdot 1\ hour
+	\end{aligned}
+\end{equation}
+
+\textbf{2. 计算每种资源在接下来一小时内每运行一步（或一个迭代周期，在ML作业中通常体现为一个batch）的花费。}公式~\ref{eq_scost}给出了计算方法。其中$M[inst][hp]$代表了HPT任务$hp$在示例类型$inst$上的运行速度（每步的耗时，seconds / step），由SpotTune持续在线监控模型在每种实例上的训练情况得出。
+
+\begin{equation}\label{eq_scost}
+	\begin{aligned}
+		\mathbb{E}\left[sCost\right] &= \mathbb{E}\left[\frac{M[inst][hp] \cdot eCost}{1\ hour}\right]  \\
+		&=\frac{M[inst][hp] \cdot \mathbb{E}\left[eCost\right]}{1\ hour} \\
+		&=\frac{M[inst][hp] \cdot (1-p) \cdot \overline{price} \cdot 1\ hour}{1\ hour} \\
+		&=M[inst][hp] \cdot (1-p) \cdot \overline{price}
+	\end{aligned}
+\end{equation}
+
+至于实例回收概率$p$，SpotTune通过一个精心调试的LSTM神经网络模型来预测，此处不再赘述。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/lr-res56-loss.png}}
+    \caption{Logistic Regression与Resnet-56的训练曲线。}
+    \label{lr_res56_loss}
+\end{figure}
+
+
+另一方面，SpotTune认为每个ML训练任务的曲线都可以使用一个分段函数进行建模，并利用其部分数据来拟合整个曲线实际的形状，进而预测曲线的最终走势。图~\ref{lr_res56_loss}展示了两种ML任务的训练曲线，都呈现出明显的反比例特征和阶段性特征（通常而言，阶段性的特征一般是由学习率的突变导致的）。且第一张图显示可以通过部分的曲线形状来预测最终的曲线走势，进而提前淘汰一部分模型。EarlyCurve将每个ML训练任务按照公式~\ref{eq_curve_fitting}进行建模，通过当前收集到的部分数据将其拟合为一个分段函数。
+
+\begin{equation}\label{eq_curve_fitting}
+	\hat{\mathcal{L}_k} = \sum_{i=1}^{ST}(\frac{1}{\alpha_{i0} \cdot k^2 + \alpha_{i1} \cdot k + \alpha_{i2}} + \alpha_{i3}) \cdot sign(k, l_i, r_i)
+\end{equation}
+
+公式~\ref{eq_curve_fitting}工作的前提是用户先指定一个早停系数$\theta \in [0, 1]$，当训练完成$\theta$时，EarlyCurve开始预测模型的最终走势，并在此时淘汰一部分模型。这个参数反映了用户对于调参任务的激进程度，小的$\theta$可能会使预测准确率降低，但是能更快地结束HPT，反之亦然。具体$\theta$的选择，依赖具体场景和用户的具体需求。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/example_workflow_fat_v4.pdf}}
+    \caption{SpotTune工作流程示例。}
+    \label{example_spottune}
+\end{figure}
+
+图~\ref{example_spottune}给出了SpotTune的一个示例工作流程。在该流程中，一个HPT任务被启动的第一小时就被回收，因此第一小时的算力对于SpotTune而言是免费的。后面该模型再次被调度之后运行超过了一小时，因此被SpotTune主动停止，并再次被调度到别的实例上。最终，当任务完成度为$\theta$时，SpotTune判断其是否是一个优秀的模型，如果是的话将继续训练直到结束，否则其占用的计算资源将被直接释放掉。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/data-para-faas-ml.jpg}}
+    \caption{基于PS架构的serverless ML系统。}
+    \label{data_para_faas_ml}
+\end{figure}
+
+SpotTune通过利用云上的动态资源，辅以一定的资源选取策略和ML训练过程预测算法，使得HPT可以在云上经济高效的运行。与Proteus类似，该类系统常常将成本放在系统设计的首位。云计算以其pay-as-you-go的使用模型俘获了大量用户，然而大到企业用户，小到个人用户，往往都会将成本放在首位，因为在云上获得的任何算力都会直接或间接地转化为经济开销，对于机器学习这种耗费算力的场景更是如此。正因为这样场景的普遍性存在，类似Proteus和SpotTune的基于云商服务进行二次开发的第三方系统才层出不穷。
 
 \subsection{基于FaaS的模型训练系统}
 %infocom 19
+除了上述基于IaaS服务的ML系统外，近年来基于新型计算模式FaaS的ML系统也逐渐进入学术圈的视野。FaaS，亦即serverless computing，是一种新型的计算模式。其关键词serverless是一个用户维度的特征词，并非真的没有服务器，而是在用户的角度感知不到后端服务器的存在。用户只需要上传其业务代码，并声明相应的hook API，即可在云端部署一个事件驱动的function，这也是FaaS，即function as a service这一代称的由来。用户的函数一般按照请求次数收费，并且根据请求负载的变化，云厂商会进行弹性伸缩。这种细粒度的收费模式和弹性的使用模式使得应用上云变得更为简单，也自然有学者想到将其与ML联系在一起。
+
+然而，serverless computing中的函数一般是无状态的，且不同的函数之间一般无法直接通信（一个函数可以在service维度调用另一个函数的API，但是同一个service的不同函数实例一般无法感知其它函数实例的存在），实际上并不是天然适用于ML系统的，要实现FaaS风格的ML系统，势必要在当前的serverless computing框架之上进行深度修改。
+
+L. Feng等人\parencite{feng2018exploring}在2018年提出了一种简单的基于serverless的ML训练框架，其系统仍然采用PS作为主要框架。为了解决不同函数之间无法直接通信的问题，其采用云数据库作为中间存储层，使得不同的函数实例通过共享存储的方式进行通信。这一思想类似操作系统中进程间通信（IPC）的实现方式之一，即共享内存。图~\ref{data_para_faas_ml}描绘了该系统的架构图。其PS架构中的server和worker的实体都是函数。由于云数据库本身没有对参数进行聚集、更新、分发的能力，其server函数实际上负责参数的push和pull操作，数据的实际存储位置还是在数据库中。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/ec2-lambda-diff.png}}
+    \caption{在AWS Lambda和EC2上训练一个逻辑回归模型的耗时和花费。每个点代表一个epoch。}
+    \label{ec2_lambda_diff}
+\end{figure}
+
+基于上述基本架构，H. Wang等人\parencite{wang2019distributed}在2019年使用强化学习算法来辅助决策整个系统中的函数个数和分布。其基本假设在于，不同的函数数量会导致不同的训练完成事件和最终花费，且其模式难以通过简单的规律来总结。而且对于不同的ML模型，规律也不尽相同。图~\ref{ec2_lambda_diff}以在一个具有8核心CPU的EC2虚拟机实例上训练模型耗费的事件和产生的花费作为baseline对比了不同的函数数量下花费和耗时的不同。
 
 \subsection{基于公有云服务的模型部署系统}
 % MArk
