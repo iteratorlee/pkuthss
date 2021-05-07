@@ -365,7 +365,28 @@ A. Harlap等人在2018年提出了服务部署系统Tributary\parencite{harlap20
     \label{tributary_arch}
 \end{figure}
 
-Tributary虽然利用云上的资源开发的模型部署系统，但仍然没有逃离传统的基于IaaS资源部署服务的模式。
+Tributary虽然利用云上的资源开发的模型部署系统，但仍然没有逃离传统的基于IaaS资源部署服务的模式。C. Zhang等人在2019年提出了MArk\parencite{zhang2019mark}，一种基于多种云资源混用的模型部署系统。其充分研究了公有云上不同类型资源的特点和差异性，包括常规的VM，容器服务，动态VM，突发型VM，以及GPU型VM，以便指定相应的算法，在合适的场合使用合适的资源。这里对突发型的VM实例，即Burstable Instances做简单介绍。该种类型的实例CPU能力在平时维持在一个性能较低的水平，但是用户可以令其在特定时刻以较高的性能维持一段时间。一般而言，该种类型实例的价格比按需型实例要低很多。
+
+其经过一些列的实验，C. Zhang等人得出如下四条结论：1. 基于VM进行模型部署可以达到最优的花费和最优的性能，但是难以处理突发的增量请求。如果将其与FaaS服务相结合，或许可以解决上述问题。2. 突发型的实例可能可以应对突发的请求。3. 在按需型实例中，比较小的实例性价比更高，虽然和大型的实例相比其响应延时也要更高。4. 只有将请求进行适当的打包批量处理，才可能发挥GPU型实例的优势，使其响应延时和花费优于CPU型的实例。
+
+基于上述四条观察，作者提出了MArk。图~\ref{mark_arch}描述了MArk的系统架构。其后端将多种云资源视作潜在的资源池，根据负载的动态变化和SLO的具体要求来进行资源选择和配置。MArk的资源配置策略可以概括为如下3条，其细节本文不再详述。
+
+\textbf{1. 确定最佳的Batching参数。}在GPU实例上进行Batching可以达到较好的服务质量和较优的花费，但是Batching的两个重要参数，batching队列长度和batching等待时间，却需要精心调整。作者根据公式~\ref{eq_batching}，辅以线下性能建模的方式，来确定最佳的参数选择。
+
+\begin{equation}\label{eq_batching}
+    \begin{aligned}
+        &W_{batch} + T_b \leq RT_{max}, \\
+        &W_{batch} + T_b \leq \frac{b}{\mu^*_{nb}}
+    \end{aligned}
+\end{equation}
+
+\textbf{2. 使用Lambda和Burstable Instances应付突发的请求。}虽然使用VM来进行模型部署能达到最优花费和性能，但是VM的启动时间过长，在请求数量突然增多时，难以快速横向拓展来进行应对。Lambda具有较短的启动时间和较强的横向拓展能力，可以用来处理突发请求，当扩容的VM启动之后，再将流量导向新增的VM实例。同时MArk还预先启动了若干单价便宜的Burstable Instances，当请求增多时，也可以额将流量暂时导向这些实例，以利用其短暂的CPU峰值性能。具体在上述两种方案之间如何选择，就依赖于MArk根据具体的负载曲线和这两种方案产生的花费多少来进行权衡。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/mark-arch.png}}
+    \caption{MArk系统架构图。}
+    \label{mark_arch}
+\end{figure}
 
 \subsection{基于FaaS的模型部署系统}
 %一系列FaaS for ML serving的工作，INFaaS etc
