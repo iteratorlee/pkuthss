@@ -280,7 +280,15 @@ SpotTune通过利用云上的动态资源，辅以一定的资源选取策略和
 %infocom 19
 除了上述基于IaaS服务的ML系统外，近年来基于新型计算模式FaaS的ML系统也逐渐进入学术圈的视野。FaaS，亦即serverless computing，是一种新型的计算模式。其关键词serverless是一个用户维度的特征词，并非真的没有服务器，而是在用户的角度感知不到后端服务器的存在。用户只需要上传其业务代码，并声明相应的hook API，即可在云端部署一个事件驱动的function，这也是FaaS，即function as a service这一代称的由来。用户的函数一般按照请求次数收费，并且根据请求负载的变化，云厂商会进行弹性伸缩。这种细粒度的收费模式和弹性的使用模式使得应用上云变得更为简单，也自然有学者想到将其与ML联系在一起。
 
-然而，serverless computing中的函数一般是无状态的，且不同的函数之间一般无法直接通信（一个函数可以在service维度调用另一个函数的API，但是同一个service的不同函数实例一般无法感知其它函数实例的存在），实际上并不是天然适用于ML系统的，要实现FaaS风格的ML系统，势必要在当前的serverless computing框架之上进行深度修改。
+然而，serverless computing实际上并不是天然适用于ML系统的，要实现FaaS风格的ML系统，势必要在当前的serverless computing框架之上进行深度修改。总体而言，若要应用于ML的工作负载，serverless computing目前还存在如下问题：
+
+\textbf{1. 本地内存和磁盘空间小。}通常而言，为了更快的横向拓展，轻量是函数计算设计的第一要义。因此，目前流行的FaaS架构，所支持的内存大小和磁盘大小都有限。例如AWS Lambda仅支持最多3GB的本地内存和512MB的本地磁盘。而现有的ML系统一般会在本地保留一份完整的数据集，并将数据集全部load到内存中以加快训练过程，这与serverless的设计原则是相违背的。当下的流行的Tensorflow，Spark等框架便无法不加修改地在AWS Lambda内运行。
+
+\textbf{2. 带宽有限，无法进行p2p通信。}与VM相比，serverless函数一般网络带宽非常有限。例如，最大的AWS Lambda函数仅支持上线为60MBps的带宽，这与数据中心中的千兆网络，万兆网络甚至Infini-band相比是非常低的。另外，serverless computing中的函数一般是无状态的，且不同的函数之间一般无法直接通信（一个函数可以在service维度调用另一个函数的API，但是同一个service的不同函数实例一般无法感知其它函数实例的存在）。因此，在本地数据中心中常用的通信策略，例如树形或者环形的all-reduce通信在serverless环境中是无法实现的。
+
+\textbf{3. 生命周期短且启动时间不稳定。}Serverless函数一般是为在线的service设计的，因此其生命周期天然较短。同时其启动时间不稳定，例如AWS Lambda的启动时间甚至最长可以达到一分钟。因此，基于serverless computing的ML系统必须能够很好的处理频繁的函数启停。
+
+\textbf{4. 缺少快速的共享存储支持。}为了解决函数之间无法通信的问题，共享存储是一种常用的手段。但目前云环境中支持serverless使用的共享存储仅限于对象存储、数据库等SaaS服务，其响应延时、吞吐量等仍然无法与数据中心环境中的共享内存相比。
 
 L. Feng等人\parencite{feng2018exploring}在2018年提出了一种简单的基于serverless的ML训练框架，其系统仍然采用PS作为主要框架。为了解决不同函数之间无法直接通信的问题，其采用云数据库作为中间存储层，使得不同的函数实例通过共享存储的方式进行通信。这一思想类似操作系统中进程间通信（IPC）的实现方式之一，即共享内存。图~\ref{data_para_faas_ml}描绘了该系统的架构图。其PS架构中的server和worker的实体都是函数。由于云数据库本身没有对参数进行聚集、更新、分发的能力，其server函数实际上负责参数的push和pull操作，数据的实际存储位置还是在数据库中。
 
@@ -290,7 +298,39 @@ L. Feng等人\parencite{feng2018exploring}在2018年提出了一种简单的基�
     \label{ec2_lambda_diff}
 \end{figure}
 
-基于上述基本架构，H. Wang等人\parencite{wang2019distributed}在2019年使用强化学习算法来辅助决策整个系统中的函数个数和分布。其基本假设在于，不同的函数数量会导致不同的训练完成事件和最终花费，且其模式难以通过简单的规律来总结。而且对于不同的ML模型，规律也不尽相同。图~\ref{ec2_lambda_diff}以在一个具有8核心CPU的EC2虚拟机实例上训练模型耗费的事件和产生的花费作为baseline对比了不同的函数数量下花费和耗时的不同。
+基于上述基本架构，H. Wang等人\parencite{wang2019distributed}在2019年提出了基于serverless computing的ML系统Siren，使用强化学习算法来辅助决策整个系统中的函数个数和分布。其基本假设在于，不同的函数数量会导致不同的训练完成事件和最终花费，且其模式难以通过简单的规律来总结。而且对于不同的ML模型，规律也不尽相同。图~\ref{ec2_lambda_diff}以在一个具有8核心CPU的EC2虚拟机实例上训练模型耗费的时间和产生的花费作为baseline对比了不同的函数数量下花费和耗时的不同。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/siren-arch.png}}
+    \caption{Siren系统架构和工作流。}
+    \label{siren_arch}
+\end{figure}
+
+图~\ref{siren_arch}描述了Siren的系统架构和工作流。用户基于Siren提供的API Lib提供其模型代码包和数据集。上传至公有云之后，Siren对任务进行初始化并开始运行。运行过程中每个epoch产生的数据将反馈给Function Manager，然后Function Manager将上述数据反馈给强化学习调度器。调度器根据上述数据计算当前的reward并输出下一次决策的action，并反馈给scheduler，最终重新配置函数资源，开始下一个epoch的训练。与L. Fang等人的工作类似，Siren也采用了基于共享存储的PS架构。
+
+事实上，serverless computing对ML的限制不仅仅在于网络通信，函数内部同样存在限制。例如，AWS Lambda中，代码包的大小被限制到250MB，运行时长被限制到300秒，运行内存大小限制到3GB。Siren采取了如下措施规避上述限制：1）重新编译MXNet，去掉USE\_CUDA，USE\_CUDNN，USE\_OPENMP等并行选项，因为serverless函数可以成千上万的并发，因此Siren追求的是函数级别的并发，而非函数内部进程级别的并发；2）每一个epoch由调度器重新分配一次函数，这与强化学习的reward-action机制也相符合。
+
+Siren的经济高效是由其强化学习调度器所决定的。该调度器接受每个epoch结束后的函数状态作为输入设计reward函数，并进行下一次调度。图~\ref{drl_siren}展示了Siren的强化学习调度器的决策流程。关于其强化学习算法的细节设计此处不再赘述，亦非本报告所关注的重点。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/drl-siren.png}}
+    \caption{Siren中强化学习调度器的工作流程。}
+    \label{drl_siren}
+\end{figure}
+
+整个ML模型产出的周期中不仅包含模型训练，还包括数据预处理、超参数调整等。在serverless computing的环境下支持一站式的ML工作流，如下两个问题可能会得到解决：
+
+\textbf{1. 资源超配。}在ML的整个工作流中，资源利用率实际上变化是十分剧烈的。在以VM为计算设施的环境中，开发者为了能够性能，通常会按照整个工作流中的资源利用率峰值来配置和获取资源，这无疑造成了严重的资源浪费。而serverless computing拥有优秀的弹性，能够根据工作负载的实际强度为用户配置合适的资源，从而可能解决这类资源超配问题。
+
+\textbf{2. 透明的资源管理。}一般而言，专业的机器学习从业人员并不具备熟练的系统配置与优化技能。因此，现有的基于VM的环境配置方案，特别是在分布式场景下，为开发人员施加了很大的压力。因此亟需一直透明的资源管理方法，对于ML从业人员而言，其只需关注模型相关的算法代码，其余应该交由系统完成， 这与serverless computing产生的初衷是类似的，serverless的计算模型有解决此类问题的天然土壤。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/cirrus-arch.png}}
+    \caption{Cirrus系统架构。}
+    \label{cirrus_arch}
+\end{figure}
+
+J. Carreira等人\parencite{carreira2019cirrus}在2020年提出了Cirrus，一个基于serverless的支持一站式ML工作流的框架。其支持了数据预处理、模型训练、模型调优等ML工作流中的关键阶段，并为用户提供了友好的FaaS风格的API。与前两个工作类似，Cirrus也采取PS模型作为整个系统的基础框架。图~\ref{cirrus_arch}描述了Cirrus的系统架构
 
 \subsection{基于公有云服务的模型部署系统}
 % MArk
