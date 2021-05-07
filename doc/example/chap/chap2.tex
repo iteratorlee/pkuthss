@@ -330,7 +330,25 @@ Siren的经济高效是由其强化学习调度器所决定的。该调度器接
     \label{cirrus_arch}
 \end{figure}
 
-J. Carreira等人\parencite{carreira2019cirrus}在2020年提出了Cirrus，一个基于serverless的支持一站式ML工作流的框架。其支持了数据预处理、模型训练、模型调优等ML工作流中的关键阶段，并为用户提供了友好的FaaS风格的API。与前两个工作类似，Cirrus也采取PS模型作为整个系统的基础框架。图~\ref{cirrus_arch}描述了Cirrus的系统架构
+J. Carreira等人\parencite{carreira2019cirrus}在2020年提出了Cirrus，一个基于serverless的支持一站式ML工作流的框架。其支持了数据预处理、模型训练、模型调优等ML工作流中的关键阶段，并为用户提供了友好的FaaS风格的API。与前两个工作类似，Cirrus也采取PS模型作为整个系统的基础框架。图~\ref{cirrus_arch}描述了Cirrus的系统架构。所不同的是，Cirrus实现了自己的数据存储系统Data Store。
+
+Cirrus中的Data Store是在云VM上实现的，其支持key-value的存储接口，例如set/get，和常用的PS架构接口，例如push/pull参数。其设计时通过如下几个优化，使得该存储系统实现了高并发、低延迟、高吞吐：
+
+\textbf{1. 多线程服务器设计。}为了达到高吞吐量，Cirrus的Data Store充分利用的多线程的优势，将负载分布在不同的CPU核上。实验证明，这样的设计增加了30\%的吞吐量。
+
+\textbf{2. 数据压缩。}为了减少网络传输的数据量，Cirrus的Data Store在get或者set时，都会将需要传输的数据进行预先压缩，这样一来所传输的数据就会大幅减少。实验证明，这样的设计将数据传输量减少了50\%。
+
+\textbf{3. 传输稀疏数据。}Cirrus在传输参数和模型数据时，只传送那些修改了的数据条目，也就以稀疏数据的形式进行传输。实验证明，这样的设计将数据传输量进一步减少了90\%。
+
+Cirrus屏蔽了底层设计的复杂性，向上对用户提供简洁的python接口，图~\ref{cirrus_api_example}展示了数据预处理、模型训练和超参数调整阶段Cirrus需要用户编写的代码示例。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/cirrus-api-example.png}}
+    \caption{Cirrus用户接口API示例。}
+    \label{cirrus_api_example}
+\end{figure}
+
+以上述三篇工作为代表，从18-19年的架构和调度算法的优化，到20年开始研究实现serverless专用的共享存储系统，可以看出，学术界正在一步一步深入推动serverless computing在ML系统中的应用。FaaS风格的ML系统也确实解决了配置难、超配造成资源浪费等常见的问题。
 
 \subsection{基于公有云服务的模型部署系统}
 % MArk
