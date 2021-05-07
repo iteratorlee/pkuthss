@@ -357,7 +357,7 @@ Cirrus屏蔽了底层设计的复杂性，向上对用户提供简洁的python�
 
 公有云中存在着多种多样的资源可以用来部署模型，例如IaaS和FaaS，都提供了部署模型的能力。其中IaaS中的VM还可以按照收费方式分为按需实例、预留实例和抢占实例等种类。和模型训练/调参类似，模型部署也同样需要考虑性能和成本两个角度。首先模型的在线服务也属于一种service，所以其在大多数情况下都存在对该service的质量要求，即服务等级目标（Service Level Object，SLO）。例如，一个SLO的典型例子便是要求至少95\%的请求需要在100ms内完成响应。因此，在云环境中对于模型部署系统的研究一般都集中在一个问题上，即如何在保证模型服务的SLO的前提下，尽量降低成本。
 
-A. Harlap等人在2018年提出了服务部署系统Tributary\parencite{harlap2018tributary}。与其前作Proteus类似，Tributary也同样充分利用了云市场中的动态资源，例如AWS的Spot Instances。图~\ref{tributary_arch}展示了Tributray的系统结构图。和Proteus类似，其采用了基于LSTM的价格预测模型，预测接下来一段时间内资源池中的所有实例在运行该服务时的潜在花费，并在其中选取最优实例。和Proteus相比，实际上是一种更为简单的场景，因为service本质上是一种无状态的负载，在动态实例启停时，无需考虑对先前状态的包括和恢复。
+A. Harlap等人在2018年提出了服务部署系统Tributary\parencite{harlap2018tributary}。与其前作Proteus类似，Tributary也同样充分利用了云市场中的动态资源，例如AWS的Spot Instances。图~\ref{tributary_arch}展示了Tributray的系统结构图。和Proteus类似，其采用了基于LSTM的价格预测模型，预测接下来一段时间内资源池中的所有实例在运行该服务时的潜在花费，并在其中选取最优实例。和Proteus相比，实际上是一种更为简单的场景，因为service本质上是一种无状态的负载，在动态实例启停时，无需考虑对先前状态的保存和恢复。
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=\textwidth]{figures/tributary-arch.png}}
