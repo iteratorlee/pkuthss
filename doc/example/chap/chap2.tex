@@ -390,6 +390,17 @@ Tributary虽然利用云上的资源开发的模型部署系统，但仍然没�
 
 \subsection{基于FaaS的模型部署系统}
 %一系列FaaS for ML serving的工作，INFaaS etc
+FaaS最常用的使用场景就是服务的云端部署，从这个角度来讲，不考虑serverless computing本身的若干缺点，纯FaaS的模型部署方式几乎是最理想的。尤其是从ML用户的角度而言，一旦模型完成训练和调参，用户只需将模型文件上传到云端，并声明相应的API，即可完成模型的部署，至于弹性伸缩则交由后端的云商来做即可。
+
+V. Ishakian等人\parencite{ishakian2018serving}在2018年在AWS Lambda上基于MXNet测试了若干模型对外提供服务的能力。其结论可以用一句话来概括：在热启动的前提下，利用serverless服务进行模型的在线部署是可行的，无论性能还是花费都可以接受，但是第一次请求会因为冷启动造成非常明显的高延时。Ishakian等人测试的主要是图像分类相关的模型，而Z. Tu等人\parencite{tu2018pay}在2018年针对自然语言处理的模型在AWS Lambda进行的相关实验。图~\ref{nlp_serving_arch}展示了在AWS的云环境中部署NLP模型的示例。如图所示，除了Lambda，该系统还用到了AWS的云数据库服务DynamoDB来存储词向量。模型部署之前用户先将训练得到的词向量上传至云数据库中，在实际对外提供服务时，Lambda会按需从DynamoDB中获取相关的词向量。然而在这种系统设计中仍然存在两个问题。首先，冷启动的问题仍然没有解决。其次，由于Lambda没有本地的词向量缓存，在请求频率比较高的场景下，云数据库的延时和吞吐率难以满足服务的SLO。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/nlp-serving-arch.png}}
+    \caption{NLP模型在AWS云环境的部署。}
+    \label{nlp_serving_arch}
+\end{figure}
+
+因此，现有的公有云上以AWS Lambda为代表的FaaS服务难以直接应用于模型部署。然而FaaS只是一种云资源的使用模式，并非于某个云厂商绑定，学术界也开始更多的探索更为先进的FaaS架构。F. Romero等人在2019年提出INFaaS，一种model-less的模型部署系统。
 
 \section{小结}
 % vim:ts=4:sw=4
