@@ -43,6 +43,9 @@ OpenCL也是一个并行加速库，其基础功能和CUDA类似，最大的区�
 %SC 17 Topology-aware
 %NSDI 19 Tiresias
 %OSDI 20 HiveD
+
+TODO:补充基础的GPU scheduling算法
+
 随着深度学习的兴起和快速发展，在计算机视觉、自然语言处理等领域使用的模型参数越来越多，规模越来越大。而对于大规模的深度学习模型，分布式训练+GPU硬件加持几乎成为了标配。分布式训练的场景中，GPU之间的数据传输时有发生。然而在一个多GPU的集群环境中，位于整个系统拓扑结构不同位置的GPU之间的数据传输速度是有很大差异的。
 
 \begin{figure}[h]
@@ -74,6 +77,14 @@ M. Amaral等人通过对两个图进行匹配并最小化公式~\ref{eq_top_min}
 \begin{equation}\label{eq_top_min}
     MIN\ \alpha^{cc}\frac{t^{cc}}{t_w}+\alpha^b\frac{I^b}{I_w}+\alpha^d\frac{\omega^d}{\omega^w}
 \end{equation}
+
+M. Amaral等人的工作综合考虑了多项指标，以使得集群达到一个最优状态。在这样的集群中，所有的任务都被视作拥有同样的优先级。因此，可能存在集群中常见的长尾问题。图~\ref{hived_pending}就描述了这样一个场景。租户A和租户B都需要使用GPU，然而由于调度问题，虽然集群中还剩余4个GPU，却无法分配给B。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/hived-pendding.png}}
+    \caption{GPU集群中一个任务被阻塞。}
+    \label{hived_pending}
+\end{figure}
 
 \subsection{Multi Jobs on one GPU: 机器学习集群中的GPU共享机制}
 %OSDI 18 Gandiva
