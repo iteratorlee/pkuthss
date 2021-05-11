@@ -171,9 +171,65 @@ H. Zhao等人在2020年提出了HiveD\parencite{zhao2020hived}，使用Virtual P
 
 \subsection{基于SGX技术的上层应用}
 
+首先在最基础的容器粒度上，Arnautov等人提出了一种基于SGX实现的安全容器SCONE。SCONE对SGX进行了进一步的抽象来保护容器中的进程。其为开发者提供了C语言标准库接口来便利地开发基于SGX的应用程序。SCONE的设计中系统调用在可信执行环境之外进行，但通过加密技术保证了可信执行环境之外的数据也是安全的。进一步地，为了降低在可信执行环境中进行线程切换的开销，SCONE将操作系统线程映射为逻辑的应用线程，通过在应用线程间调度操作系统线程来最大化线程在可信执行环境中的运行时间。在易用性上，SCONE兼容Docker，对Docker用户是透明的。在Apache、Redis、NGINX等应用上的测试表明，SCONE可以达到原生应用0.6至1.2倍的吞吐量。
+
+SCONE针对的是单机的容器环境，Hunt等人则基于SGX技术设计和实现了面向分布式环境的可信计算中间件Ryoan。Ryoan针对的是无状态、采用面向请求数据模型的应用，其提出了新的执行模型，对不可信代码模块施加限制，并严格执行防止机密泄露的I/O策略。Ryoan可以使得互不信任的多个参与方能够在不受信任的平台上（例如云平台）以分布式的方式进行敏感数据的计算。Hunt等人更进一步地基于Ryoan开发了包括图像处理系统、垃圾邮件过滤器在内的多个真实应用作为研究案例。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/vc3-arch.png}}
+    \caption{VC3架构图。}
+    \label{vc3_arch}
+\end{figure}
+
+SCONE和Ryoan等都是基于SGX在系统软件这个层次所做的工作，用以帮助开发者更便捷地使用SGX技术。相比之下，VC3是更上层的工作，其基于SGX开发了一个可信的分布式数据处理框架，可以运行在未修改的Hadoop之上。图~\ref{vc3_arch}阐述了VC3的设计理念：在VC3中，数据和代码（例如Map和Reduce程序）在可信执行环境之外都是加密的。VC3解决了三方面的问题来使得这个数据处理框架具有实用性：首先，为了实现更轻量级的可信计算基，VC3的设计只将核心的Map和Reduce函数运行在可信执行环境中；其次，可信执行环境只能保证单个Map或Reduce任务的完整性，为此VC3提出了专门的作业执行协议来保证整个分布式计算的完整性；最后，VC3提供了新的编译器支持来防止不安全的内存访问。在通用测试基准数据集上的实验显示，相比于原生Hadoop，实现“写完整性”保护和“读写完整性”保护的VC3仅额外产生了4.5\%和8\%的运行时开销。
+
 \subsection{集群中SGX资源的管理}
 
+可信执行环境技术的实现离不开新的硬件支持。换言之，在支持可信执行环境的计算机上，操作系统管理除传统的CPU、内存、I/O等系统资源以外，还需要管理新型的特殊硬件资源。以Intel SGX为例，其使用了一种特殊的被称为EPC（Enclave Page Cache）的加密内存来运行代码和数据。以EPC为代表的新型硬件的出现给云原生共享集群的管理带来了挑战。共享集群通过让不同的分布式应用共享底层硬件资源来优化系统管理、提升集群资源利用率。“共享”意味着管理系统需要基于虚拟化等技术手段来对资源进行抽象和隔离，防止不同应用程序在共享硬件资源时因竞争而产生相互干扰，导致性能下降甚至是程序崩溃等问题。
+
+对于传统的CPU、内存、I/O等硬件资源，当前的操作系统已具备成熟的机制（如容器）对其进行隔离。共享集群管理系统也依赖于操作系统的这种能力来完成资源分配、变更和调度。但遗憾的是，当前的操作系统虚拟化和隔离可信执行环境所依赖的新型硬件资源的能力还较为有限，这给云原生共享集群在利用这些资源时带来了挑战。以现有的共享集群管理系统为例，YARN尽管提出了容器的概念用以进行资源划分和分配，但那只是一种逻辑的抽象，在实际运行时，YARN并没有将任务封装在LXC、Docker之类的操作系统虚拟化容器中。在早期的版本中，YARN只对内存这单一维度的资源进行限制。当YARN启动一个任务时，同时还会启动一个监控器对任务进程的内存消耗进行监控。当任务进程消耗的内存超过任务申请的内存时，YARN会将该任务终止。而对于如CPU之类的其他资源，尽管用户在提交作业时也会为每个任务指定申请的资源配额，但这些信息仅仅会被用来进行调度决策，YARN不会对这些资源进行限制。因此，一个指定了1个CPU核数的任务在机器较为空闲时可能会使用超过1个CPU核数的资源。随着时间的发展，在后续版本中，YARN引入了cgroups机制，通过cgroups实现了对CPU、I/O等资源的限制。
+
+因为YARN启动任务就是启动进程，如果想在YARN中运行SGX任务，只需在集群节点上安装好SGX驱动程序等相关环境即可。但当前的YARN缺少接收任务使用EPC资源需求的接口，因此YARN在调度时不会考虑SGX作业需要使用多少EPC资源。进一步地，YARN缺乏隔离EPC的能力，因此调度到同一台机器上的两个SGX程序会竞争EPC使用，导致程序性能下降。
+
+与YARN 相比，Kubernetes管理和编排的是以Docker为代表的操作系统虚拟化容器。也就是说，在Kubernetes中，任务进程都是运行在Docker容器里的。对于SGX任务而言，如果想要以Docker的形式运行，需要将主机上的\textit{isgx}设备文件映射到容器里。在Kubernetes里运行SGX任务则更复杂一些，需要使Kubernetes具备管理EPC的能力。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/k8s-yaml.png}}
+    \caption{使用SGX设备插件在Kubernetes中提交任务时编写yaml文件。}
+    \label{k8s_yaml}
+\end{figure}
+
+Kubernetes 提供了一套被称为设备插件（Device Plugin）的机制来接入新型硬件设备，例如SGX、GPU、FPGA等。设备插件提供一个RPC服务接口向kubelet进行注册，发送管理的设备列表。kubelet是Kubernetes运行在每个节点上的代理，它会进一步地将这些硬件资源信息发送到集群主节点上的API服务器中。用户在请求使用这些新型硬件资源时，可以在配置文件yaml中指定这些设备的配额。Kubernetes的调度器在进行调度时会根据用户请求的资源配额以及从API服务器获取的实时资源容量进行资源分配和任务放置。
+
+阿里云团队的工程师基于Kubernetes 的这套机制实现了面向SGX 的设备插件。该插件在Kubernetes中定义了一种被称为alibabacloud/sgx\_epc\_MiB的新资源来表示EPC资源。代码片段~\ref{k8s_yaml}是一个使用该SGX 设备插件在Kubernetes中提交任务的示例。可以看到，用户可以在yaml文件中通过resources:requests/limits字段来指定容器对SGX EPC资源的需求和限制。该设备插件使得Kubernetes上的任务可以方便地使用SGX资源。但由于操作系统和SGX驱动缺乏隔离EPC的能力，用户通过resources:requests/limits字段指定的数值只会用到Kubernetes的资源调度中，而无法像传统的CPU、内存等资源那样，真正地做到对容器使用EPC的大小进行限制。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/sgx-aware-sche.png}}
+    \caption{SGX可感知的调度系统。}
+    \label{sgx_aware_sche}
+\end{figure}
+
+Neuchâtel大学的Vaucher等人在这个方向上做了进一步的工作，基于Kubernetes实现了SGX可感知的集群管理系统。图是~\ref{sgx_aware_sche}SGX 可感知的集群管理系统的系统架构，该系统主要在四个方面做出了改进：第一，基于Kubernetes 的设备插件机制，实现了SGX 设备的接入。第二，基于节点EPC 实时使用情况实现SGX 可感知的容器调度。第三，基于Kubernetes 的监控模块Heapster 以及时序数据库InfluxQL 实现集群对各节点EPC 使用情况的实时监控。第四，修改Intel 官方的原生SGX 驱动程序，实现EPC 实时使用数据的信息采集以及限制容器使用EPC 的大小，防止因EPC 资源竞争而导致程序性能下降。
+
 \subsection{在机器学习任务中应用SGX技术}
+由于SGX EPC大小的限制（可供应用程序使用的仅有不足100MB），在实际生产环境中很难直接应用于大型机器学习模型的训练，多数情况下SGX被用于有隐私需求的模型部署。尽管如此O. Ohrimenko等人\parencite{197247}和R. Kunkel\parencite{kunkel2019tensorscone}等人还是在SGX环境下的机器学习模型训练做了若干尝试。O. Ohrimenko等人在SGX环境下实现了若干传统的机器学习算法如K-means，SVM，decision-tree等，并证实了其性能在一定程度上是可以接受的。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/tensorscone-arch.png}}
+    \caption{TensorSCONE架构图。}
+    \label{tensorscone_arch}
+\end{figure}
+
+R. Kunkel则基于其前序工作SCONE\parencite{arnautov2016scone}实现了支持机器学习任务的安全容器环境TensorSCONE。图~\ref{tensorscone_arch}阐述了TensorSCONE的架构示意图。TensorSCONE基于的SCONE是与Docker完全兼容的，且实现了标准的本地认证和远程认证API。考虑到在EPC受限的环境中应该采用尽可能轻量级的框架，其在应用层框架上其选择了较为轻量的机器学习框架Tensorflow Lite（TF Lite）。其在SCONE容器内部实现了一个定制化的controller，负责重载TF Lite的若干功能，并为上层应用提供统一的接口。在其实验中，其仅测试了ML任务的模型推断，并称利用TensorSCONE框架训练一个Inception模型可能需要数月的时间。
+
+J. Ma在2020年提出了S3ML\parencite{ma2020s3ml}，基于服务器端的可信执行环境技术SGX来实现云端机器学习模型部署的安全可信。图~\ref{s3ml_arch}表述了S3ML的架构。S3ML从两个方面来提升云原生共享集群对安全可信应用的支持。首先，S3ML抽象凝练了开发者在使用可信计算环境技术构建应用中所面临的共性需求，将密钥生成、分发、持久化等必备功能实现成独立的安全服务。依赖于该服务，应用开发的效率可以显著提升。其次，在管理可信执行环境设备方面，S3ML提出了一种方法，在给定一个服务SLO的情况下对服务进行离线性能分析，探索服务延时与硬件资源指标的定量定性关系。进一步地，S3ML提出新的系统架构与机制，合理利用SGX特殊硬件资源的实时监控信息，保障在运行着混合负载、存在资源争用的共享集群里依然能够满足服务SLO。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/s3ml-arch.png}}
+    \caption{S3ML架构示意图。}
+    \label{s3ml_arch}
+\end{figure}
 
 \section{小结}
+本章介绍了加速型硬件GPU和安全型硬件SGX在云环境中为机器学习带来的新的机遇和挑战。对于GPU的利用，本章从两个角度展开。第一个是集群环境中以单个GPU为最小调度单位的GPU集群调度算法，该类算法一般关注GPU之间的连接和拓扑结构，旨在实现一定的任务放置策略使得任务性能最大化、集群吞吐率最大化。同时，结合优先级分级的方法，使得低优先级的任务可以在机会性资源上运行，可以进一步提升集群的资源利用率。另一个角度是多个ML任务共用同一个GPU。从本质上讲，这也是一种GPU调度的场景，只不过最小调度单位是部分GPU。这种场景下，除了传统的GPU虚拟化手段，近年来越来越多的研究人员尝试在特定的业务场景下（机器学习模型的训练即为一个典型的场景）实现特定的GPU共享机制。SGX是云环境中支持安全计算的硬件。由于其兴起时间较晚，因此在其上运行机器学习负载的研究还处于探索阶段，未能大规模应用于生产环境。事实上，Intel计划在不久的未来随着新架构CPU的发布对SGX技术做同步更新，其所能支持的EPC上限可能会大幅度提升，这无疑会给大规模模型的安全训练和部署带来新的潜在解决方案。未来一段时间内，机器学习任务针对GPU和SGX的研究将持续称为学术界的研究热点。
 % vim:ts=4:sw=4
