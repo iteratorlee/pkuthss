@@ -98,7 +98,7 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
     \label{ps_arch}
 \end{figure}
 
-\textbf{利用参数服务器模型（Parameter-Server Model，即PS Model）实现分布式训练和参数共享。}如图~\ref{ps_arch}所示，在一个基于PS Model的集群中，服务器被分为两种，分别为worker和server。其中server负责保存模型所有需要训练的参数，worker负责具体的训练。在worker完成一轮迭代之后，会将更新后的参数变化量push到server端，并同步等待所有其它的worker完成此轮迭代。同步完成后，server汇总从worker端得到的变化量并对参数进行更新，而后worker再从server端pull更新后的参数，并继续进行下一轮迭代。值得一提的是，实际场景中为了追求训练速度，有时也会允许异步的参数更新，即不要求worker等待其它peer节点完成本轮计算，而是完成本地计算后就可以向server请求pull新的参数。这种弱一致性的设计会加快训练速度，通过也可能牺牲模型的质量。如图~\ref{sagemaker_ps}所示，在Sagemaker中，分布式训练就是通过参数服务器模型来实现的，且一般默认使用的是弱一致性的模式。同时，为了方便push和pull的操作，AWS实现了一个key-value的存储系统KVStore。
+\textbf{利用参数服务器模型（Parameter-Server Model，即PS Model）\parencite{186214}实现分布式训练和参数共享。}如图~\ref{ps_arch}所示，在一个基于PS Model的集群中，服务器被分为两种，分别为worker和server。其中server负责保存模型所有需要训练的参数，worker负责具体的训练。在worker完成一轮迭代之后，会将更新后的参数变化量push到server端，并同步等待所有其它的worker完成此轮迭代。同步完成后，server汇总从worker端得到的变化量并对参数进行更新，而后worker再从server端pull更新后的参数，并继续进行下一轮迭代。值得一提的是，实际场景中为了追求训练速度，有时也会允许异步的参数更新，即不要求worker等待其它peer节点完成本轮计算，而是完成本地计算后就可以向server请求pull新的参数。这种弱一致性的设计会加快训练速度，通过也可能牺牲模型的质量。如图~\ref{sagemaker_ps}所示，在Sagemaker中，分布式训练就是通过参数服务器模型来实现的，且一般默认使用的是弱一致性的模式。同时，为了方便push和pull的操作，AWS实现了一个key-value的存储系统KVStore。
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=\textwidth]{figures/sagemaker-ps.png}}
@@ -363,15 +363,17 @@ Cirrus屏蔽了底层设计的复杂性，向上对用户提供简洁的python�
 
 公有云中存在着多种多样的资源可以用来部署模型，例如IaaS和FaaS，都提供了部署模型的能力。其中IaaS中的VM还可以按照收费方式分为按需实例、预留实例和抢占实例等种类。和模型训练/调参类似，模型部署也同样需要考虑性能和成本两个角度。首先模型的在线服务也属于一种service，所以其在大多数情况下都存在对该service的质量要求，即服务等级目标（Service Level Object，SLO）。例如，一个SLO的典型例子便是要求至少95\%的请求需要在100ms内完成响应。因此，在云环境中对于模型部署系统的研究一般都集中在一个问题上，即如何在保证模型服务的SLO的前提下，尽量降低成本。
 
-A. Harlap等人在2018年提出了服务部署系统Tributary\parencite{harlap2018tributary}。与其前作Proteus类似，Tributary也同样充分利用了云市场中的动态资源，例如AWS的Spot Instances。图~\ref{tributary_arch}展示了Tributray的系统结构图。和Proteus类似，其采用了基于LSTM的价格预测模型，预测接下来一段时间内资源池中的所有实例在运行该服务时的潜在花费，并在其中选取最优实例。和Proteus相比，实际上是一种更为简单的场景，因为service本质上是一种无状态的负载，在动态实例启停时，无需考虑对先前状态的保存和恢复。
+A. Harlap等人在2018年提出了服务部署系统Tributary\parencite{harlap2018tributary}。与其前作Proteus类似，Tributary也同样充分利用了云市场中的动态资源，例如AWS的Spot Instances。和Proteus类似，Tributary也采用了基于LSTM的价格预测模型，预测接下来一段时间内资源池中的所有实例在运行该服务时的潜在花费，并在其中选取最优实例。和Proteus相比，实际上是一种更为简单的场景，因为service本质上是一种无状态的负载，在动态实例启停时，无需考虑对先前状态的保存和恢复。
 
 \begin{figure}[h]
-    \centerline{\includegraphics[width=\textwidth]{figures/tributary-arch.png}}
-    \caption{Tributray系统架构图。}
-    \label{tributary_arch}
+    \centerline{\includegraphics[width=\textwidth]{figures/clipper-arch.png}}
+    \caption{Clipper系统架构图。}
+    \label{clipper_arch}
 \end{figure}
 
-Tributary虽然利用云上的资源开发的模型部署系统，但仍然没有逃离传统的基于IaaS资源部署服务的模式。C. Zhang等人在2019年提出了MArk\parencite{zhang2019mark}，一种基于多种云资源混用的模型部署系统。其充分研究了公有云上不同类型资源的特点和差异性，包括常规的VM，容器服务，动态VM，突发型VM，以及GPU型VM，以便指定相应的算法，在合适的场合使用合适的资源。这里对突发型的VM实例，即Burstable Instances做简单介绍。该种类型的实例CPU能力在平时维持在一个性能较低的水平，但是用户可以令其在特定时刻以较高的性能维持一段时间。一般而言，该种类型实例的价格比按需型实例要低很多。
+Tributary虽然利用云上的资源开发的模型部署系统，但仍然没有逃离传统的基于IaaS资源部署服务的模式。D. Crankshaw等人在2017年提出了Clipper，一种基于容器技术的模型部署框架。如图~\ref{clipper_arch}所示，Clipper将整个部署系统抽象应用层、模型选择层、模型抽象层以及模型框架层。其向下加绒了tensorflow，spark等主流机器学习框架，向上为用户提供统一的REST API。Clipper还采用adaptive batching的技术，动态调整模型推断过程中batch size的大小，使系统的性能达到最优。
+
+在Clipper的基础之上，C. Zhang等人在2019年提出了MArk\parencite{zhang2019mark}，一种基于多种云资源混用的模型部署系统。其充分研究了公有云上不同类型资源的特点和差异性，包括常规的VM，容器服务，动态VM，突发型VM，以及GPU型VM，以便指定相应的算法，在合适的场合使用合适的资源。这里对突发型的VM实例，即Burstable Instances做简单介绍。该种类型的实例CPU能力在平时维持在一个性能较低的水平，但是用户可以令其在特定时刻以较高的性能维持一段时间。一般而言，该种类型实例的价格比按需型实例要低很多。
 
 其经过一些列的实验，C. Zhang等人得出如下四条结论：1. 基于VM进行模型部署可以达到最优的花费和最优的性能，但是难以处理突发的增量请求。如果将其与FaaS服务相结合，或许可以解决上述问题。2. 突发型的实例可能可以应对突发的请求。3. 在按需型实例中，比较小的实例性价比更高，虽然和大型的实例相比其响应延时也要更高。4. 只有将请求进行适当的打包批量处理，才可能发挥GPU型实例的优势，使其响应延时和花费优于CPU型的实例。
 

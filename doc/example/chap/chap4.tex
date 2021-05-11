@@ -15,7 +15,7 @@
 
 尝试解决此类问题的相关工作，其大体可以分为两类：1）数据驱动的线下建模方法；2）基于搜索的线上优化方法。本节按照这种分类方法介绍相关工作。
 
-\subsection{数据驱动的线下建模方法}
+\subsection{数据驱动的线下建模方法}\label{sec_profling}
 
 该类方法旨在通过在线下收集一系列形如 <meta data, performance> 的键值对，然后利用机器学习算法对上述键值对建立回归模型，以预测性能。其中meta data中可能既包括配置信息，如当前运行环境的硬件配置（CPU核数，CPU代数，memory大小等等），又包括可以刻画该workload的一些信息，如workload运行时某一时刻的CPU利用率等等。对于用户而言，使用该类算法的总体流程如图\ref{offline_profiling}所示。
 
@@ -106,6 +106,14 @@ H. Mao等人在2019年提出了Decima，利用message passing等方法，将DAG�
 \end{figure}
 
 F. Li等人在2019年提出了DeepJS\parencite{li2019deepjs}，将问题模型化为选择机器-作业对的问题，每次调度前构造可行的机器作业对列表，由神经网络输出每个对的得分，优先调度得分高的机器作业对。A. Mirhoseini等\parencite{mirhoseini2017device}使用强化学习算法训练了Tensorflow计算操作的放置策略（放置于哪个计算设备，如CPU），它使用了一种循环神经网络去编码状态，而不是采用具有可扩展性的图神经网络。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/neo-arch.png}}
+    \caption{Neo系统架构示意图。}
+    \label{neo_arch}
+\end{figure}
+
+受到Decima的启发，有一些学者开始考虑将深度学习算法和图神经网络应用到云数据库中的查询优化中，因为数据库中的一次查询所对应的语法树天生就是一个DAG图，图的节点对应数据库中的operator。R. Marcus等人在2019年提出Neo\parencite{marcus2019neo}，一种基于深度学习的数据库查询优化器。图~\ref{neo_arch}阐述了Neo的系统架构。与~\ref{sec_profling}中所述的基于线下模型训练的性能预测方法类似，Neo需要先使用sample workload，通过一个已有的最优优化器（可能是基于专家的经验，也可能基于历史信息），构建一个查询优化的信息库（即图中的Experience）。当用户发起查询时，Neo中的特征提取器会结合经验和用户的查询语句对其进行特征提取。此处的特征提取Neo使用了树形的卷积网络对语句中的operator进行编码，然后做出决策，交由数据库引擎执行。T. Kraska在2019年也提出了一个基于深度学习的数据库系统SageDB\parencite{47669}。和Neo相比，SageDB更进一步，其在数据库查询执行、数据预取等阶段都利用机器学习模型做了相关优化
 
 \section{小结}
 
