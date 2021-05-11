@@ -11,7 +11,7 @@
 
 \section{云环境中机器学习作业对GPU的利用}
 
-本节将先对GPU的现状做简要介绍，包括现代GPU的架构以及常见的GPU API和编程模型。然而，本章将从两个角度展开当前学术界针对ML任务对GPU的利用的研究：1）One Job on Multi GPUs。即一个ML任务需要多个GPU设备。这种情况一般出现在大型模型的分布式训练中。在一个大规模GPU集群中，不同的训练任务对GPU数量的需要可能不一样，如何对这些任务进行调度，使系统的资源利用率最高，同时保证训练任务的性能，是学术界研究的重点问题；2）Multi Jobs on one GPU。即在同一个GPU设备运行多个ML任务。这种情况在资源短缺或多租户的场景下较为常见。
+本节将先对GPU的现状做简要介绍，包括现代GPU的架构以及常见的GPU API和编程模型。然后，本章将从两个角度展开当前学术界针对ML任务对GPU的利用的研究：1）One Job on Multi GPUs。即一个ML任务需要多个GPU设备。这种情况一般出现在大型模型的分布式训练中。在一个大规模GPU集群中，不同的训练任务对GPU数量的需要可能不一样，如何对这些任务进行调度，使系统的资源利用率最高，同时保证训练任务的性能，是学术界研究的重点问题；2）Multi Jobs on one GPU。即在同一个GPU设备运行多个ML任务。这种情况在资源短缺或多租户的场景下较为常见。
 
 \subsection{GPU简介}
 
@@ -78,22 +78,100 @@ M. Amaral等人通过对两个图进行匹配并最小化公式~\ref{eq_top_min}
     MIN\ \alpha^{cc}\frac{t^{cc}}{t_w}+\alpha^b\frac{I^b}{I_w}+\alpha^d\frac{\omega^d}{\omega^w}
 \end{equation}
 
-M. Amaral等人的工作综合考虑了多项指标，以使得集群达到一个最优状态。在这样的集群中，所有的任务都被视作拥有同样的优先级。因此，可能存在集群中常见的长尾问题。图~\ref{hived_pending}就描述了这样一个场景。租户A和租户B都需要使用GPU，然而由于调度问题，虽然集群中还剩余4个GPU，却无法分配给B。
-
 \begin{figure}[h]
     \centerline{\includegraphics[width=\textwidth]{figures/hived-pendding.png}}
-    \caption{GPU集群中一个任务被阻塞。}
+    \caption{GPU集群中的调度异常：一个任务被阻塞。}
     \label{hived_pending}
 \end{figure}
 
+M. Amaral等人的工作综合考虑了多项指标，以使得集群达到一个最优状态。在这样的集群中，所有的任务都被视作拥有同样的优先级。因此，可能存在集群中常见的长尾问题。图~\ref{hived_pending}就描述了这样一个场景。租户A和租户B都需要使用GPU，然而由于调度问题，虽然集群中还剩余4个GPU，却无法分配给B。这种情况被称之为调度过程中的异常（anomaly）。
+
+H. Zhao等人在2020年提出了HiveD\parencite{zhao2020hived}，使用Virtual Private Cluster的概念和伙伴算法（即Buddy Cell算法）来解决调度中的异常。HiveD中将任务分为两类：高优先级的需要保证资源的任务和低优先级的尽可能用“机会性资源”来提升集群资源利用率的任务。其使用的伙伴算法在Linux内核中的内存管理模块中也是常用的算法。图~\ref{hived_diff_view}表达了HiveD中两类任务中不同的资源视角。HiveD中将GPU按照连接方式划分为不同级别的Cell，如图中单个GPU称为Level 1的Cell，位于同一个CPU socket上的两个GPU称为Level 2的Cell，位于同一CPU下的四个GPU称为Level 3的Cell，位于同一台服务器下的八个GPU称为Level 4的Cell，位于同一机架上的不同服务器上的GPU集合称为Level 5的Cell。HiveD假设任务对于GPU需求都是与某一个Level的Cell中的GPU数量匹配的，其基本算法思路如下：当有一个任务需要一个Level k的Cell时，先查看系统中有无现有空载的Level k的Cell，如果没有则将一个Level k+1的Cell分裂为两个Level k的Cell，如果再没有则继续向上一层Cell请求分裂，直到存在空载的Cell为止。同时，如图~\ref{hived_diff_view}所示，高优先级和低优先级的任务视角中，资源的使用情况是不同的。如果一个Cell被高优先级的任务占用，则在低优先级任务的视角中，这个Cell被标记为“已使用”，不能被抢占。反之，低优先级任务占用的Cell在高优先级任务的视角中被标记为dirty，在必要的情况下可以抢占其使用。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/hived-diff-view.png}}
+    \caption{HiveD中的两种视角。}
+    \label{hived_diff_view}
+\end{figure}
+
+总体而言，与传统的集群资源调度其类似，以GPU设备为最小调度单位的系统调度器中，首要的目标是保证集群的吞吐率，即单位时间内处理任务的数量。近年的做法都是基于GPU之间的互联情况对GPU设备（组）进行分类，进而使用各种算法使任务的需求与系统当前的状态匹配，达到降低任务运行时间、提升系统吞吐率的目标。在此基础上，在一些碎片化的资源上部署一些低优先级的作业，可以进一步提升系统的资源利用率。
+
 \subsection{Multi Jobs on one GPU: 机器学习集群中的GPU共享机制}
 %OSDI 18 Gandiva
-%Eurosys 18 Optimus
-%ASPLOS 20 SwapAdviosr
 %MLSys 20 Salus
-\section{云环境中机器学习作业对SGX的利用}
+除了以单个GPU为单位，在真实的业务场景中也存在多个任务共享同一个GPU的需求。该需求出现于云计算刚刚兴起的早期，即如何对GPU进行虚拟化。常用的应将资源例如CPU，网络和存储等都有非常成熟的虚拟化方案。以CPU为例，常见的虚拟化一般可以分为虚拟机和容器两大类。虚拟机有着比云计算更悠久的历史。IBM 公司在 1970 年阐述了其最原始的虚拟机系统设计。在 1972 年，虚拟机第一次在 IBM 公司的大型机上出现。通过 IBM VM370 系统能够将一台大型机分为可独立运行操作系统的多台虚拟机。在计算虚拟化技术中，原本的物理计算机被称为宿主机（Host)，运行在宿主机之上的虚拟机被称为客户机（Guest）。虚拟机技术的核心是 VMM（虚拟机监控器 Virtual Machine Monitor 或者虚拟机管理器 Virtual Machine Manager），也被称为 Hypervisor。容器是进些年来更受关注的轻量级虚拟化技术。与虚拟机技术不同，容器并不对 CPU 指令以及硬件设备进行虚拟化，它是一种操作系统级的虚拟化技术。容器通过操作系统内核提供的功能，来实现不同用户进程的资源隔离与访问隔离，形成一个个独立的运行时环境，即“容器”。
 
-\subsection{SGX技术发展历程简介}
+云计算的兴起离不开虚拟化的发展。当前，主流的云厂商例如AWS，Azure等，都同时提供了虚拟机服务和容器服务。这些服务基于对计算资源（主要是CPU）、网络资源（带宽、虚拟网络）和存储资源（虚拟云盘）的虚拟化，支持用户在虚拟计算环境中独立且互不干扰地运行各种负载。然而GPU作为现今一种重要的计算资源，却始终没有一种统一的、完善的虚拟化方案应用于公有云环境，而是在不同的业务场景中存在不同的虚拟化方案。
+
+根据实现方式的不同，当前GPU的虚拟化大致可以分为三类：
+
+\textbf{1. API转发。}这种方式在GPU架构的上层对GPU进行虚拟化。由于GPU的厂商一般不会开源GPU的驱动源码，因此在驱动层对GPU进行虚拟化是非常困难的。基于API转发的虚拟化实现方式类似于远程过程调用（Remote Procedure Call，RPC），即在虚拟机OS中实现一个agent，该agent会截获应用程序所有对GPU的调用，并将相关调用转发到宿主机上的GPU设备上进行实际的执行，执行完毕后再返回给虚拟机OS中的应用程序。
+
+\textbf{2. 半/全虚拟化。}这种方式在驱动层对GPU进行虚拟化（一般由厂商来实现），一般会定制一个专门的driver安装在虚拟机OS中。与API转发相比，这种方式由driver直接调用宿主机的driver API，不需要你agent的转发，从而缩短了调用链，使其性能更优。
+
+\textbf{3. 基于硬件的虚拟化。}这种方式也称为pass-through（译作直连），即赋予虚拟机直接访问宿主机设备的能力。这种方式产生的额外开销是最小的，但是一般而言隔离型比较差。
+
+上述三种方式中，API转发是学术界的工作最为常用的方法，无论是在基于虚拟机的环境中，还是在基于容器的轻量级虚拟化环境中。图~\ref{api_remoting}描述了虚拟机环境中基于API转发的GPU虚拟化的工作流程。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/api-remoting.png}}
+    \caption{基于API转发的GPU虚拟化。}
+    \label{api_remoting}
+\end{figure}
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/convgpu.png}}
+    \caption{ConVGPU架构。}
+    \label{convgpu_arch}
+\end{figure}
+
+在容器环境中基于API转发的方式和上图类似。D. Kang等人在2017年提出了ConVGPU\parencite{kang2017convgpu}，通过在docker容器中安插一个CUDA wrapper来对一些与GPU显存相关的API（例如cudamelloc，cudafree等）进行截获，并实现了一个管理全局显存分配的调度模块。如图~\ref{convgpu_arch}，ConVGPU实际上是以一个中间件的形式存在于容器环境中的。在正常的API调用路径下，插入一个显存管理的组件，在软件层面实现了GPU显存的共享和一定程度上的隔离。
+
+而更多的GPU共享的解决方案是与具体的应用场景高度绑定的，尤其是在运行机器学习任务的集群中。W. Xiao等人在2018年提出了Gandiva\parencite{xiao2018gandiva}，主要面向深度学习集群中基于GPU的模型训练任务进行调度。有别于传统的suspend/resume机制，Gandiva使用grow/shrink机制。图~\ref{gandiva_grow_shrink}表现了Gandiva的grow-shrink机制。Gandiva中主要存在如下三种动作：1）grow。即当前如果存在空闲的资源，Gandiva会让存在空闲资源的节点上的某些任务占用的资源拓展到空闲资源上，以提升系统的资源利用率和模型的训练速度（如图~\ref{gandiva_grow_shrink}中的Gandiva:(3) Grow-shrink）。2）shrink。当系统中有新的训练任务到达时，Gandiva一般不会将一个任务直接shutdown，而是将其所占用的资源进行裁剪，腾出新的资源以供新的任务所用（如图~\ref{gandiva_grow_shrink}中的Gandiva:(3) Grow-shrink）。3）migration。当系统其它节点中存在空闲资源时，Gandiva会将一个非独占的任务迁移到该空闲资源上（如图~\ref{gandiva_grow_shrink}中的Gandiva:(2) Migration）。值得注意的是，Gandiva在实验中发现，深度学习任务的显存占用一般呈周期性涨落的趋势，其峰值显存占用率和谷值显存占用率差距非常大。因此其在迁移任务时会根据任务占用显存的变化趋势，在任务占用显存最小的时候对任务进行迁移，以降低迁移产生的额外开销。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/gandiva-grow-shrink.png}}
+    \caption{Gandiva grow/shrink机制。}
+    \label{gandiva_grow_shrink}
+\end{figure}
+
+事实上，Gandiva中所提到的深度学习任务显存占用的周期性涨落趋势，也可以用来实现更细粒度的GPU共享。P. Yu等人在2020年提出了Salus\parencite{yu2020salus}，使用快速任务切换和显存贡献实现GPU的共享。Salus将显存分成多个Lane，一个Lane中可以存在一个或者多个深度学习模型训练任务。由于深度学习模型训练任务都是周期性迭代的过程，Salus调度的最小单位是任务的一个周期（在模型训练中通常体现为一个batch）。图~\ref{salus_arch_sche}展示了Salus的架构和一个调度示例。Salus为常用的ML框架如Tensorflow和Pytorch定制了相应的适配器。对于用户的模型训练程序的每一次迭代周期，都会以一个session的形式提交到Salus的session管理器。Salus根据提交的session的显存变化曲线，将session调度到合适的Lane中。然后调度器根据系统当前显存分配的状况，调度相应的Lane在GPU上执行。右图中即为一个例子，Job 1 和Job 2在显存变化曲线上存在明显的互补性，使得Job 2的波峰恰好可以将Job 1的波谷填满，因此Salus调度其在同一个Lane上执行。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/salus-arch-sche.png}}
+    \caption{Salus架构与调度示例。}
+    \label{salus_arch_sche}
+\end{figure}
+
+云环境中的GPU共享其实也是GPU集群资源调度的一部分，只不过其最小调度单位由整个的GPU变成了单个GPU的一部分。随着GPU虚拟化和共享机制的日渐成熟，多个任务共用同一个GPU在云环境中将成为常态。
+
+\section{云环境中机器学习作业对SGX的利用}
+能够安全可信地使用由第三方云厂商提供的计算服务是云消费者的重要需求。尤其是当前人工智能技术盛行，很多个人开发者、研究团队和中小型公司都有利用公有云算力训练机器学习模型的需求。但是这些用户需要将具有一定私密性的数据上传到云厂商，这在一定程度上是具有潜在的安全性风险的。因此用户需要以一种安全的方式对云资源进行利用。当前，能够满足这一需求的主流解决方案包括同态加密（Homomorphic Encryption）和可信执行环境（Trusted Execution Environment）。同态加密是一种密码学技术，可以对加密后的密文直接进行计算，并且计算结果解密后与明文计算的结果相一致。2009 年斯坦福大学的Craig Gentry首次提出了通用的同时支持加法同态和乘法同态的全同态加密方法，在理论上证明了云计算资源安全使用的可能。用户可以将数据加密后在云端进行计算，然后将结果传输回本地进行解密，这样可以同时做到既依赖了云端的强大算力又保证了数据安全性。但由于该方案引入了巨大的计算开销，出于性能原因至今仍然没有得到广泛的使用。
+
+可信执行环境是一种基于硬件的解决方案，其本质上相当于为用户提供了一种安全的沙箱环境。用户可以在可信执行环境中进行计算，并且能够得到机密性和完整性的保障，而包括Hypervisor、操作系统、主机上可信执行环境以外的其他应用都没有权限读写可信执行环境中的数据，从而保证了用户使用云计算资源的安全性。代表性的可信执行环境实现包括Intel的SGX技术和ARM的TrustZone技术。相比于全同态加密，这些技术有着更高的计算效率，近年来在云计算环境下有着强隐私保护需求的许多场景里得到了实际应用。因此，本节主要着眼于可信执行环境这种云计算资源在机器学习场景下的安全性利用方案，以Intel SGX技术为重点，对相关技术进行调研。
+
+\subsection{SGX技术简介}
+可信执行环境是解决服务使用者与供应者之间信任问题的一种流行方案。在服务器端，英特尔软件保护扩展（Intel Software Guard Extensions，SGX）是目前最主流且被使用最多的可信执行环境技术，用于保护运行在不受信任平台上程序的机密性（Confidentiality）和完整性（Integrity），于2015年在Intel Skylake系列的CPU中首次被推出。图~\ref{sgx_arch}概述了SGX的简单特性。SGX提供了被称为飞地（Enclave）的硬件安全沙箱，用于托管用户代码和数据，防止其被飞地外不受信任的特权进程（例如Hypervisor 和操作系统）窃取或篡改。本章提出的解决方案基于SGX设计和实现。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/sgx-arch.png}}
+    \caption{SGX架构图。}
+    \label{sgx_arch}
+\end{figure}
+
+截至2021年3月，SGX包括两个主要版本，最初的版本通常被称为SGX 1.0，另一个版本具有增强的特性，如飞地动态内存管理，被称为SGX 2.0。由于SGX 2.0仅在有限的CPU 系列上支持，因此本文只讨论SGX 1.0，其已经包含了SGX核心的安全特性。SGX技术通过一组CPU 指令扩展和专用硬件架构来构建所谓的飞地。飞地里的代码和数据都运行在特殊的加密内存里，只有飞地里的程序运行在CPU 里时才会对相应的代码和数据进行解密。因此，即使攻击者有机会接触到硬件，通过窥探内存（Hardware Snoop）的方式也只能看到加密后的信息。在一个飞地进行初始化之前，代码和数据保存在主机的非可信区域。同时，SGX也无法保障飞地以外数据的安全性。因此，为了保护秘密，在使用SGX时，数据应该在飞地外进行加密，然后传输到飞地内解密后进行计算。
+
+\textbf{认证（Attestation）}：SGX提供了认证机制，其功能是让用户可以验证一段已知的程序确实是运行在一台支持SGX功能的计算机的飞地里的。认证又包括本地认证（Local Attestation）和远程认证（Remote Attestation）。本地认证使得一个飞地可以向运行在同一平台上的另一个飞地证明自己的身份。远程认证使得一个飞地可以向远程第三方实体证明自己的身份。SGX提供了飞地度量值（即MRENCLAVE和MRSIGNER两个值）用来在认证过程中表明飞地的身份并验证飞地的完整性。
+
+\textbf{密封（Sealing）}：在飞地中运行的代码和数据是易失性的。密封是SGX 提供的一种机制，用于将数据保存到持久化的非可信存储中，例如硬盘。在密封过程中，应用使基于可信执行环境的可信应用快速构建与支撑机制用密封密钥（Sealing Key）在飞地中加密数据。密封密钥只能由该应用的飞地程序获得，并且是从根密封密钥（Root Sealing Key）衍生而来的。根密封密钥则是硬件编码在CPU中，并且每一个支持SGX的CPU的根密封密钥都是互不相同的，这就决定了某一飞地在某台机器上密封的数据只能在该台机器上进行解密。
+
+\textbf{飞地页面缓存（Enclave Page Cache，EPC）}：飞地所驻留的特殊加密内存区域被称为EPC。EPC由专用硬件加密，禁止所有来自非飞地内存的访问。EPC以4KB的粒度划分为页面进行内存分配。飞地在初始化时申请它需要的所有EPC空间，并且在分配之后不能动态修改。EPC的总大小非常有限，在一台计算机上，SGX飞地应用程序可以使用的EPC的大小是128MB。在这其中，只有约93.5MB的大小可供用户程序和数据使用，剩余空间预留用来存储SGX相关的元数据。在当前的大数据时代，EPC的空间过于稀少，并且单机上的EPC会被所有的SGX程序分享，这就导致每一个飞地实际可用的EPC空间就更小了。在服务器市场主流的Linux操作系统上，SGX驱动支持通过页交换技术来实现EPC超配，每个飞地实际可以申请超过128MB的内存使用。当EPC中没有空闲页分配给飞地使用时，SGX驱动程序会基于缓存替换算法将EPC中的某些页面加密后放置到非加密的常规内存DRAM上去。当这些换出的页面在重新被需要使用时又会被换入到EPC 中。因为换入换出页面时涉及到完整性校验等高计算开销的过程，因此会导致应用程序性能的显著降低。先前的工作表明，这种开销平均会使系统性能降低5倍。由于EPC很小，并且由运行在一台机器上的所有飞地竞争，因此可能会频繁地触发页交换。
+
+\textbf{SGX应用程序开发}：当前主要有两种方式来开发面向SGX的应用程序。第一种是基于功能划分的方式。使用这种方式来开发程序通常需要将整个应用设计为可信与非可信两个部分。敏感数据由运行在飞地内的可信程序处理，其他功能由飞地外的非可信程序完成。使用Intel原生SGX软件开发工具或如Asylo一类的开源框架来编写软件是这类开发方式的典型代表。这类方式可以更有效地利用EPC资源，但需要付出较大的努力对传统非SGX环境下的留存应用进行重构。第二种方式是使用库操作系统（LibraryOS，LibOS）来进行开发。库操作系统通过实现应用所需的系统调用来支持在飞地内运行整个程序。这种方式为留存应用提供了更好的兼容性，对开发人员更加友好。目前主流的面向SGX环境设计的库操作系统包括Haven、Panoply、Graphene-SGX和Occlum。
+
+\subsection{基于SGX技术的上层应用}
+
+\subsection{集群中SGX资源的管理}
 
 \subsection{在机器学习任务中应用SGX技术}
 
