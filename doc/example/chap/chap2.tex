@@ -275,7 +275,7 @@ SpotTune之所以能做到经济高效，是由Provisioner和Orchestrator中的R
 图~\ref{example_spottune}给出了SpotTune的一个示例工作流程。在该流程中，一个HPT任务被启动的第一小时就被回收，因此第一小时的算力对于SpotTune而言是免费的。后面该模型再次被调度之后运行超过了一小时，因此被SpotTune主动停止，并再次被调度到别的实例上。最终，当任务完成度为$\theta$时，SpotTune判断其是否是一个优秀的模型，如果是的话将继续训练直到结束，否则其占用的计算资源将被直接释放掉。
 
 \begin{figure}[h]
-    \centerline{\includegraphics[width=\textwidth]{figures/data-para-faas-ml.jpg}}
+    \centerline{\includegraphics[width=\textwidth]{figures/data-para-faas-ml.png}}
     \caption{基于PS架构的serverless ML系统。}
     \label{data_para_faas_ml}
 \end{figure}
