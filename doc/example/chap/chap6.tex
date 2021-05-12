@@ -2,10 +2,10 @@
 
 \section{研究动机}
 
-作者现阶段的研究设想均与机器学习模型部署相关。一个是在新的云计算服务模式下的进行模型部署，另一个是在安全计算环境SGX中进行模型部署。二者所要达到的目的也类似，即在保证服务质量的前提下，尽量提升集群的资源利用率。
+作者现阶段的研究设想均与机器学习模型部署相关。一个是利用新的云计算服务模式FaaS进行模型部署，另一个是在安全计算环境SGX中进行模型部署。二者所要达到的目的也类似，即在保证服务质量的前提下，尽量提升集群的资源利用率。
 
 \subsection{基于FaaS的模型部署系统现状}
-serverless是一种非常适合部署ML模型的计算模式，其具有细粒度计费、横向拓展能力强的特点。但是现有的serverless框架用来做ML模型部署时，仍然存在一定的问题；
+serverless是一种非常适合部署ML模型的计算模式，其具有计费粒度细、横向拓展能力强的特点。但是现有的serverless框架用来部署ML模型时，仍然存在一定的问题；
 \begin{itemize}
     \item 当前公有云的serverless服务仅使用CPU，单个servereless实例没有并发能力，能够满足的吞吐量有限。而横向拓展又会因为冷启动造成延迟增加，可能会违背任务的SLO。
     \item serverless一般是基于容器技术实现的（例如Docker等）。而容器使用GPU一般是独占的方式（nvidia-docker），这样会造成显存浪费。通过实验可以证明，在满足一定SLO的前提下，batching的上限距离显存大小仍有一定的差距。
@@ -27,7 +27,7 @@ serverless是一种非常适合部署ML模型的计算模式，其具有细粒�
 \section{研究设想}
 
 \subsection{SLO可感知的Serverless机器学习模型部署系统}
-为了让用户在云上在满足SLO的条件下更cost-efficient的使用serverless部署ML模型，本文拟提出一种SLO-aware的基于GPU显存sharing的serverless框架，解决如下问题：
+为了让用户在云上在满足SLO的条件下更经济高效地使用serverless部署ML模型，本文拟提出一种SLO可感知的基于GPU显存共享的serverless框架，解决如下问题：
 \begin{itemize}
     \item 实现一种基于API截取的GPU显存共享中间件，使得多个容器可以共享同一块GPU，且相互之间隔离。
     \item 使用GPU的serverless实例时，根据服务的SLO计算其能容许的batching的请求上限，划分一块显存给其使用。
