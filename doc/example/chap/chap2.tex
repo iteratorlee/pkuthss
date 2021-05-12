@@ -76,21 +76,21 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
 
 \textbf{Linear Learner. }即线性回归模型，一般用来解决回归或者分类问题。在Sagemaker中，其支持使用随即梯度下降（SGD）来训练一个线性模型。特别地，Sagemaker还支持对一个模型指定不同的目标函数，并且并行地训练其对应的多个模型。
 
-\textbf{Factorization Machines (FM). }FM常用于推荐系统中很多任务（例如CTR预估），是一种适用于分类和回归任务的更为通用的监督学习算法。FM是对线性模型的一种拓展，考虑了高维稀疏数据集中不同特征之间的关联。在Sagemaker中，FM也是通过SGD来进行训练的。
+\textbf{Factorization Machines (FM). }\parencite{rendle2010factorization}FM常用于推荐系统中很多任务（例如CTR预估），是一种适用于分类和回归任务的更为通用的监督学习算法。FM是对线性模型的一种拓展，考虑了高维稀疏数据集中不同特征之间的关联。在Sagemaker中，FM也是通过SGD来进行训练的。
 
-\textbf{K-Means Clustering. }K-Means聚类是一类无监督学习算法，可以将一个数据集聚为K个不同的类别。Sagemaker实现了一个流式计算版本的K-means，综合运用了来自随机优化、核心集和在线选址问题的思想。
+\textbf{K-Means Clustering. }\parencite{jain2010data}K-Means聚类是一类无监督学习算法，可以将一个数据集聚为K个不同的类别。Sagemaker实现了一个流式计算版本的K-means，综合运用了来自随机优化、核心集和在线选址问题的思想。
 
-\textbf{Principal Component Analysis (PCA). }即主成分分析，是一种通过尽可能保留数据集的方差来对数据进行降维的算法。Sagemaker实现了两种PCA算法。第一类是准确型的，通过适量的采样和特征提取，需要$O(d^2)$量级的内存大小。另一种是粗略型的，通过随即投影来减小内存开销到$O(kd)$。这里$k$和$d$分别代表主成分的个数和数据的维度。
+\textbf{Principal Component Analysis (PCA). }\parencite{tenenbaum2000a}即主成分分析，是一种通过尽可能保留数据集的方差来对数据进行降维的算法。Sagemaker实现了两种PCA算法。第一类是准确型的，通过适量的采样和特征提取，需要$O(d^2)$量级的内存大小。另一种是粗略型的，通过随即投影来减小内存开销到$O(kd)$。这里$k$和$d$分别代表主成分的个数和数据的维度。
 
 \textbf{Neural Topic Models (NTM). }在Sagemaker中，NTM是一种用来在大型离散数据集中抽取latent representation的无监督学习算法，例如抽取文档中的语料库。为了实现更快的推理，NTM是基于variational autoencoder（VAE）模型实现的。
 
-\textbf{Time Series Forecasting with DeepAR. }这是一种基于循环神经网络（RNN）的概率预测算法。和其它流行的时间序列预测算法不同，DeepAR使用一系列数据集训练了一个全局的模型，从而重点关注了在生产环境中常见的时间序列预测问题。
+\textbf{Time Series Forecasting with DeepAR. }这是一种基于循环神经网络（RNN）的概率预测算法。和其它流行的时间序列预测算法不同，DeepAR\parencite{flunkert2020deepar}使用一系列数据集训练了一个全局的模型，从而重点关注了在生产环境中常见的时间序列预测问题。
 
 \subsubsection{实现方式}
 经济和高效是云用户总是在关心的两类问题。Sagemaker为了满足这样的用户需求，充分利用了其底层的异构资源池，并通过上层的系统软件使得机器学习可以在成百上千台VM上横向拓展。
 
 \textbf{在新硬件上运行ML任务。}
-为了实现在异构的资源上（主要是CPU和GPU），Sagemaker中的大多数算法使用MXNet的库作为使用底层硬件的接口。MXNet通过一个张量算子构成的计算图来描述一个机器学习算法，同时通过将算子分配到具体的设备进行执行来实现并发地训练模型。
+为了实现在异构的资源上（主要是CPU和GPU），Sagemaker中的大多数算法使用MXNet\parencite{chen2015mxnet}的库作为使用底层硬件的接口。MXNet通过一个张量算子构成的计算图来描述一个机器学习算法，同时通过将算子分配到具体的设备进行执行来实现并发地训练模型。
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=\textwidth]{figures/ps-arch.png}}
@@ -114,7 +114,7 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
     \label{sagemaker_train_serving}
 \end{figure}
 
-\textbf{模型微调与超参数调整。}通常而言，一个超参数调整任务（Hyperparameter Tuning Optimization，即HPO）由多个并行的模型训练任务构成，这些训练任务每个都尝试一个不同的超参数组合，最后得到一个最优的配置。上述过程需要耗费大量计算资源和时间，对于寻常用户而言是非常耗时耗力的。而Sagemaker基于PS的计算模型设计保证了任意一个ML训练任务都可以随时启动和停止。这种机制使得模型微调和超参数调整变得更为容易操作：1）用户可以增量式地更新数据集，但却不用每次都重新训练模型，因为整个训练过程都是流式的；2）HPO可以同时启动多个训练任务，然后提前发现那些劣质的模型并将其终止，从而降低HPO的成本。
+\textbf{模型微调与超参数调整。}通常而言，一个超参数调整任务（Hyperparameter Tuning Optimization，即HPO）\parencite{bardenet2013collaborative}由多个并行的模型训练任务构成，这些训练任务每个都尝试一个不同的超参数组合，最后得到一个最优的配置。上述过程需要耗费大量计算资源和时间，对于寻常用户而言是非常耗时耗力的。而Sagemaker基于PS的计算模型设计保证了任意一个ML训练任务都可以随时启动和停止。这种机制使得模型微调和超参数调整变得更为容易操作：1）用户可以增量式地更新数据集，但却不用每次都重新训练模型，因为整个训练过程都是流式的；2）HPO可以同时启动多个训练任务，然后提前发现那些劣质的模型并将其终止，从而降低HPO的成本。
 
 \subsubsection{模型部署}
 作为一站式的机器学习系统，除了模型训练和调参，Sagemaker还支持模型部署。图~\ref{sagemaker_train_serving}展示了Sagemaker训练和部署模型的整体工作流。在部署时，首先，用户需要对其模型指定一个endpoint，然后将部署该模型的的代码打包成容器镜像，存储在EC2 Container Registry中。在模型实际对外提供服务时，模型文件会从对象存储S3中传输到容器中，进而以容器为单位对外提供服务。
@@ -146,7 +146,7 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
 
 \textbf{3. 充分利用云的弹性。}事实上，在机器学习模型训练过程中，存在大量的无效计算。如图~\ref{hpt_example}所示，经过大量的参数尝试，最终只剩余一个有效模型（即效果最好的模型）。因此，在参数搜索的过程中，大量的计算是无效计算。而云计算的一个重要特点就是高弹性，即用户可以因为负载增加随时获取资源，也可以因为资源闲置随时释放资源。如果效果不好的模型能够被提前发现，并释放掉其占用的计算资源，则可以避免大量无效计算，从而进一步节省成本。
 
-\textbf{4. 对计算框架进行定制。}现有的流行的机器学习框架如Tensorflow，PyTorch，MXnet等，一般都假设底层的计算资源是可靠的，因此都没有针对上述动态资源进行适配。如果要在动态资源上运行ML任务，则需要对框架进行深度定制，使其具备一定的容错能力。
+\textbf{4. 对计算框架进行定制。}现有的流行的机器学习框架如Tensorflow\parencite{abadi2016tensorflow}，PyTorch\parencite{paszke2019pytorch}，MXnet\parencite{chen2015mxnet}等，一般都假设底层的计算资源是可靠的，因此都没有针对上述动态资源进行适配。如果要在动态资源上运行ML任务，则需要对框架进行深度定制，使其具备一定的容错能力。
 
 为了解决上述问题，使ML模型训练和调参都可以在云上经济高效地进行，许多研究者提出了若干解决方案。A. Harlap等人在2017年提出了ML模型训练系统Proteus\parencite{harlap2017proteus}，针对Parameter Server架构的ML模型训练框架对AWS和Google Cloud的动态资源做了适配，使其能高效经济地在之上运行；Y. Li等人在2020年提出了SpotTune\parencite{li2020spottune}，将ML调参任务部署在AWS动态资源上，并结合一定的资源选取算法和训练趋势预测算法，使调参任务节省大量的无效计算，最终达到了经济高效的目的。下文对较有代表性的Proteus和SpotTune做较为详细的介绍。
 
@@ -175,7 +175,7 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
 
 竞价实例与按需实例、保留实例的合理使用，可以帮助虚拟云用户优化工作负载的成本和性能。根据AWS 官方博客，已经有不少大型企业（如本田汽车）成功使用AWS 的竞价实例把部分业务的计算成本下降高达70\% 。然而有效的使用竞价实例除了对负载自身的要求以外（如可中断等），还需要用户针对自身的应用场景选择“正确”的实例类型。由于竞价实例在价格和回收方面的不确定性，这是比较复杂的。
 
-Proteus是一个基于Parameter-Server（下文简称为PS）架构的机器学习系统。PS是大规模机器学习系统中常用的架构，其系统架构在\ref{subsec_sagemaker}中已描述。如其文中描述，其使用了敏捷的弹性机制并辅以“激进的”竞价策略，使得机器学习任务在云上高效经济地完成。Proteus由两个主要组件构成：AgileML和BidBrain。
+Proteus\parencite{harlap2017proteus}是一个基于Parameter-Server（下文简称为PS）架构的机器学习系统。PS是大规模机器学习系统中常用的架构，其系统架构在\ref{subsec_sagemaker}中已描述。如其文中描述，其使用了敏捷的弹性机制并辅以“激进的”竞价策略，使得机器学习任务在云上高效经济地完成。Proteus由两个主要组件构成：AgileML和BidBrain。
 
 其中，AgileML是负责协调整个PS架构的主要组件。其通过如下的基本思想，在保证整个系统可用性的前提下，尽可能多使用动态资源（即AWS Spot Instances）以降低成本：1）将PS的关键功能节点（即保存模型参数的server节点）部署在可靠资源上（如AWS的按需实例或者预留实例）；2）将PS的worker节点（即负责实际计算和参数更新的节点）部署在动态资源；3）当动态资源和可靠资源的比例不同时，AgileML会采取不同的策略。具体地，当比例比较小时（例如2:1），其简单地将server节点分布在所有的可靠资源上，而当比例比较大的时候（例如63:1），其将可靠资源作为BackupPSs而将动态资源作为ActivePSs，当发生参数更新时，更新会先到达ActivePSs。同时，在网络带宽允许的前提下，ActivePSs上会启动相应的后台任务将参数同步到BackupPSs上。
 
@@ -371,7 +371,7 @@ A. Harlap等人在2018年提出了服务部署系统Tributary\parencite{harlap20
     \label{clipper_arch}
 \end{figure}
 
-Tributary虽然利用云上的资源开发的模型部署系统，但仍然没有逃离传统的基于IaaS资源部署服务的模式。D. Crankshaw等人在2017年提出了Clipper，一种基于容器技术的模型部署框架。如图~\ref{clipper_arch}所示，Clipper将整个部署系统抽象应用层、模型选择层、模型抽象层以及模型框架层。其向下加绒了tensorflow，spark等主流机器学习框架，向上为用户提供统一的REST API。Clipper还采用adaptive batching的技术，动态调整模型推断过程中batch size的大小，使系统的性能达到最优。
+Tributary虽然利用云上的资源开发的模型部署系统，但仍然没有逃离传统的基于IaaS资源部署服务的模式。D. Crankshaw等人在2017年提出了Clipper\parencite{crankshaw2017clipper}，一种基于容器技术的模型部署框架。如图~\ref{clipper_arch}所示，Clipper将整个部署系统抽象应用层、模型选择层、模型抽象层以及模型框架层。其向下兼容了tensorflow，spark等主流机器学习框架，向上为用户提供统一的REST API。Clipper还采用adaptive batching的技术，动态调整模型推断过程中batch size的大小，使系统的性能达到最优。
 
 在Clipper的基础之上，C. Zhang等人在2019年提出了MArk\parencite{zhang2019mark}，一种基于多种云资源混用的模型部署系统。其充分研究了公有云上不同类型资源的特点和差异性，包括常规的VM，容器服务，动态VM，突发型VM，以及GPU型VM，以便指定相应的算法，在合适的场合使用合适的资源。这里对突发型的VM实例，即Burstable Instances做简单介绍。该种类型的实例CPU能力在平时维持在一个性能较低的水平，但是用户可以令其在特定时刻以较高的性能维持一段时间。一般而言，该种类型实例的价格比按需型实例要低很多。
 

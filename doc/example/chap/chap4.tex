@@ -95,7 +95,7 @@ C. Delimitrou等人在2014年提出了Quasar\parencite{delimitrou2014quasar}，�
 
 随着深度学习的进一步发展，也有许多工作尝试将强化学习应用于调度问题。强化学习（ Reinforcement Learning ）是一种机器学习方法。这种方法通过与环境不断交互获得交互的反馈，从而获得经验，再从经验中不断学习，最终获得最优策略。其中经验（experience）是与环境交互得到的状态state）、动作action）和收益reward的采样序列。
 
-H. Mao等人在2019年提出了Decima，利用message passing等方法，将DAG作业的图结构建模到神经网络中，从而使得神经网络模型具有可扩展性，可适应任意作业队列长度的输入，而后通过policy gradient等强化学习方法训练调度器。结果显示Decima相比之前的启发式调度算法至少减少了21\%的平均作业完成时间。
+H. Mao等人在2019年提出了Decima\parencite{mao2019learning}，利用message passing等方法，将DAG作业的图结构建模到神经网络中，从而使得神经网络模型具有可扩展性，可适应任意作业队列长度的输入，而后通过policy gradient等强化学习方法训练调度器。结果显示Decima相比之前的启发式调度算法至少减少了21\%的平均作业完成时间。
 
 除了使用强化学习算法，Decima中的另一个核心思想是使用图神经网络将DAG图中的作业节点编码成向量（亦称作embedding），再由这些向量生成Job级别的embedding和全局的embedding。这种思想借鉴于自然语言处理中的word2vec和图神经网络中的node2vec。如图~\ref{decima_embedding}所示，embedding生成的依据是DAG中各个节点之间的依赖关系。这样做的好处是将图中节点的依赖关系转化为高维空间中向量之间的代数关系，使得模型能够更容易的学习到规律。
 
