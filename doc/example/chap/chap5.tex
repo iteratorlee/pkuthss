@@ -1,28 +1,32 @@
 \chapter{重要文献与研究团队总结}
 
 \section{重要文献总结}
-\textbf{1. }Li M, Andersen D G, Park J W, et al. Scaling distributed machine learning with the parameter server[C]//11th {USENIX} Symposium on Operating Systems Design and Implementation ({OSDI} 14). 2014: 583-598.
+\textbf{1. }Li M, Andersen D G, Park J W, et al. Scaling distributed machine learning with the parameter server[C]//11th {USENIX} Symposium on Operating Systems Design and Implementation ({OSDI} 14). 2014: 583-598. 该论文在2014年发表在操作系统顶级会议OSDI上。其在文中提出的Parameter Server架构（PS Model），成为了后续分布式机器学习中所使用的标准架构。PS Model将集群中的服务器分为存储参数的server和负责迭代计算的worker，通过一些列健壮的设计，是的ML模型训练任务能在大规模集群上可靠、高性能地运行。如今，AWS的Sagemaker\parencite{joshi2020amazon}，腾讯的Angle等机器学习系统，皆是基于PS Model设计和开发的。
 
-\textbf{2. }Harlap A, Tumanov A, Chung A, et al. Proteus: agile ml elasticity through tiered reliability in dynamic resource markets[C]//Proceedings of the Twelfth European Conference on Computer Systems. 2017: 589-604. \textbf{\&} Harlap A, Chung A, Tumanov A, et al. Tributary: spot-dancing for elastic services with latency SLOs[C]//2018 {USENIX} Annual Technical Conference ({USENIX}{ATC} 18). 2018: 1-14.
+\textbf{2. }Harlap A, Tumanov A, Chung A, et al. Proteus: agile ml elasticity through tiered reliability in dynamic resource markets[C]//Proceedings of the Twelfth European Conference on Computer Systems. 2017: 589-604. \textbf{\&} Harlap A, Chung A, Tumanov A, et al. Tributary: spot-dancing for elastic services with latency SLOs[C]//2018 {USENIX} Annual Technical Conference ({USENIX}{ATC} 18). 2018: 1-14. 这两片论文出自同一个作者笔下，分别在2017和2018年发表在操作系统顶级会议Eurosys和USENIX ATC上。作者讨论了如何利用公有云上的动态资源进行ML模型训练和ML模型部署。作者提出了Proteus和Tributary，通过一定的容错设计和基于价格预测的资源选取策略设计，使ML模型训练任务和部署任务在保持高效的同时，利用动态资源降低成本。动态资源是云厂商推出的较为新型的资源，这两篇文章是近几年利用动态资源运行机器学习工作流的代表之作，被后续多个工作\parencite{li2020spottune}所借鉴。
 
-\textbf{3. }Crankshaw D, Wang X, Zhou G, et al. Clipper: A low-latency online prediction serving system[C]//14th {USENIX} Symposium on Networked Systems Design and Implementation ({NSDI} 17). 2017: 613-627.
+\textbf{3. }Crankshaw D, Wang X, Zhou G, et al. Clipper: A low-latency online prediction serving system[C]//14th {USENIX} Symposium on Networked Systems Design and Implementation ({NSDI} 17). 2017: 613-627. 该文章在2017年发表于计算机网络顶级会议NSDI上。作者提出了一种基于容器的模型部署系统Clipper，向下兼容了Tensorflow，Spark等机器学习框架，向上为用户提供了统一的结果，并通过adaptive batching等手段保证模型推断的性能。Clipper是学术界关于模型部署极具代表性的工作，其基本思想在后续基于云服务进行模型部署的工作中\parencite{zhang2019mark}被不断地借鉴和改进。
 
-\textbf{4. }Zhang C, Yu M, Wang W, et al. Mark: Exploiting cloud services for cost-effective, slo-aware machine learning inference serving[C]//2019 {USENIX} Annual Technical Conference ({USENIX}{ATC} 19). 2019: 1049-1062.
+\textbf{4. }Zhang C, Yu M, Wang W, et al. Mark: Exploiting cloud services for cost-effective, slo-aware machine learning inference serving[C]//2019 {USENIX} Annual Technical Conference ({USENIX}{ATC} 19). 2019: 1049-1062. 该文章在2018年发表于操作系统顶级会议USENIX ATC上。作者借鉴Clipper中adaptive batching的思想提出了模型部署系统MArk，综合利用了公有云中的IaaS，CaaS（container as s service），FaaS等资源，根据请求负载的变化趋势，动态地决定使用何种资源。该工作首次综合考虑了多种类型的资源，并根据其特点的差异性在不同的场合合理利用，使模型部署任务在公有云上高效经济地运行。
 
-\textbf{5. }Amaral M, Polo J, Carrera D, et al. Topology-aware gpu scheduling for learning workloads in cloud environments[C]//Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis. 2017: 1-12.
+\textbf{5. }Amaral M, Polo J, Carrera D, et al. Topology-aware gpu scheduling for learning workloads in cloud environments[C]//Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis. 2017: 1-12. 该工作在2017年发表在高性能计算顶级会议SC上。作者首次在GPU集群的调度问题中考虑了GPU的拓扑关系，并将之与DAG类型Job的task拓扑关系相结合，使用图论中的相关算法，对GPU集群中的任务进行调度。该工作关于GPU拓扑结构的研究，被后续很多GPU调度的相关工作\parencite{zhao2020hived}借鉴和改进。
 
-\textbf{6. }Xiao W, Bhardwaj R, Ramjee R, et al. Gandiva: Introspective cluster scheduling for deep learning[C]//13th {USENIX} Symposium on Operating Systems Design and Implementation ({OSDI} 18). 2018: 595-610.
+\textbf{6. }Xiao W, Bhardwaj R, Ramjee R, et al. Gandiva: Introspective cluster scheduling for deep learning[C]//13th {USENIX} Symposium on Operating Systems Design and Implementation ({OSDI} 18). 2018: 595-610. 该工作在2018年发表于操作系统顶级会议OSDI上。作者综合探索了深度学习集群中的调度问题，设计了一种高效调度和共享集群中GPU资源的系统Gandiva。Gandiva中的两种方法被后续很多相关工作\parencite{yu2020salus,10.1145/3437984.3458837}借鉴和改进：1）基于grow-shrink的深度学习作业横向伸缩方法；2）基于作业内存利用率周期性变化的作业迁移方法。
 
-\textbf{7. }Vaucher S, Pires R, Felber P, et al. SGX-aware container orchestration for heterogeneous clusters[C]//2018 IEEE 38th International Conference on Distributed Computing Systems (ICDCS). IEEE, 2018: 730-741.
+\textbf{7. }Vaucher S, Pires R, Felber P, et al. SGX-aware container orchestration for heterogeneous clusters[C]//2018 IEEE 38th International Conference on Distributed Computing Systems (ICDCS). IEEE, 2018: 730-741. 该论文在2018年发表在分布式计算顶级会议ICDCS上。作者基于kubernetes，提出了一种SGX资源可感知的集群调度系统。该工作首次在学术界将SGX资源引入集群资源调度中，其基本的机制被后续多个工作\parencite{ma2020s3ml}所参考。
 
-\textbf{8. }Venkataraman S, Yang Z, Franklin M, et al. Ernest: Efficient performance prediction for large-scale advanced analytics[C]//13th {USENIX} Symposium on Networked Systems Design and Implementation ({NSDI} 16). 2016: 363-378.
+\textbf{8. }Venkataraman S, Yang Z, Franklin M, et al. Ernest: Efficient performance prediction for large-scale advanced analytics[C]//13th {USENIX} Symposium on Networked Systems Design and Implementation ({NSDI} 16). 2016: 363-378. 该工作在2016年发表在计算机网络顶级会议NSDI上。作者针对基于map-reduce（MR）范式的应用程序（如Hadoop，Spark等），提出了一种性能建模方法Ernest。Ernest总结了MR范式中典型的集中数据流模式，并用以进行性能拟合，仅需用户若干次的预运行，即可推算出是性能达到最优的系统配置。Ernest是云环境中对数据处理类应用，使用线下模型训练进行性能建模的开篇之作。后续的多个工作\parencite{yadwadkar2017selecting,klimovic2018selecta,moradi2019performance,zheng2019online}，都借鉴了Ernest的思想和模型设计。
 
-\textbf{9. }Alipourfard O, Liu H H, Chen J, et al. Cherrypick: Adaptively unearthing the best cloud configurations for big data analytics[C]//14th {USENIX} Symposium on Networked Systems Design and Implementation ({NSDI} 17). 2017: 469-482.
+\textbf{9. }Alipourfard O, Liu H H, Chen J, et al. Cherrypick: Adaptively unearthing the best cloud configurations for big data analytics[C]//14th {USENIX} Symposium on Networked Systems Design and Implementation ({NSDI} 17). 2017: 469-482. 该论文在2017年发表于计算机网络顶级会议NSDI上。与Ernest类似，作者同样针对数据处理类作业，利用线上搜索的方法（贝叶斯优化，BO）搜寻适合当前作业的最佳配置。该工作首次将BO这类搜索算法应用于云资源配置优化，亦被后续多个工作\parencite{casimiro2019lynceus}借鉴和比较。
 
-\textbf{10. }Mao H, Schwarzkopf M, Venkatakrishnan S B, et al. Learning scheduling algorithms for data processing clusters[M]//Proceedings of the ACM Special Interest Group on Data Communication. 2019: 270-288.
+\textbf{10. }Mao H, Schwarzkopf M, Venkatakrishnan S B, et al. Learning scheduling algorithms for data processing clusters[M]//Proceedings of the ACM Special Interest Group on Data Communication. 2019: 270-288. 该工作在2019年发表于计算机网络顶级会议SIGCOMM上。作者首次将利用强化学习模型解决集群中数据处理作业的调度问题，提出了调度算法Decima。Decima中最关键的技术要点在于利用图神经网络对DAG类作业节点进行编码，再将其应用与强化学习调度算法。其思想被后续多个集群调度领域的相关工作和数据库查询优化的相关工作\parencite{47669,marcus2019neo}所借鉴。
 
 
 \section{重要研究团队总结}
 \textbf{Ion Stoica团队。}University of California, Berkeley的Ion Stoica教授团队在大数据处理、数据中心资源管理以及人工智能等领域取得了丰硕的研究成果。在数据处理方面，该团队提出开发了Spark、Shark、SparkR、GraphX等项目，不仅在学术界产生了影响力，并且在工业界得到了广泛利用。在这些研究成果的基础上，该团队的核心成员还创立以数据处理技术为核心的公司Databricks， 目前估值已经达到了27.5亿美元。在数据中心资源管理方面，该团队提出了DRF、Delay Scheduling等调度策略，在真实的集群调度器中得到了应用。同时，该团队也是双层调度系统Mesos与分布式调度系统Sparrow的提出者。在云资源预测与配置方面，该团队提出了Ernest。近年来，该团队也开始涉足机器学习领域，研究支撑机器学的系统和框架开发，提出了面向机器学习的分布式框架Ray。
 
 \textbf{Christos Kozyrakis团队。}Stanford University的Christos Kozyrakis教授团队在云资源管理领域上取得了丰富的研究成果。该团队在2013年时提出的Paragon，在2014年提出的Quasar都将基于机器学习的分类技术应用到了集群调度系统中，在保证应用QoS的基础上，提高了集群的资源利用率。在2015年，该团队又提出了Tarcil和Heracles。Tarcil是一个分布式调度器。Heracles则将延迟敏感型作业与批处理型作业运行在一起来提升集群资源利用率。在2016年，该团队提出了高效的云资源分配系统HCloud。在2017年，该团队提出了面向云安全的Bolt系统。在2018年，该团队提出了面向数据处理作业的云计算和存储资源优化配置的工具Selecta。
+
+\textbf{CMU PDL实验室。}Carnegie Mello University的Parallel Data Lab（PDL实验室）在分布式系统、机器学习系统、数据库系统等领域获得了丰硕的研究成果。特别地，其Big Learning课题组在机器学习系统领域常年走在学术界的最前沿。该团队在2017年提出的Proteus尝试在公有云动态资源之上构建大规模机器学习系统。在2018年提出Tributray，在公有云动态资源上部署机器学习模型。在分布式机器学习训练加速方面，在2018年提出Pipdream，实现layer-wise的并行加速。在2019年，该团队又提出了Parity Models，巧妙地利用纠删码冗余来保证模型部署系统的性能。
+
+\textbf{MSRA System Group。}微软亚洲研究院的System Group在大数据处理、机器学习系统、移动计算和图计算等领域取得了大量的研究成果。2017年，该团队提出TuX2，一个面向机器学习的分布式图计算系统。2020年，其在计算机系统领域的顶级会议OSDI上独中五元，提出了大规模GPU集群调度系统HiveD，深度学习编译优化系统Rammer等。2021年，该团队又提出了在移动CPU上进行模型推断的但系统AsyMo。
