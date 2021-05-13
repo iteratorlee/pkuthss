@@ -12,7 +12,7 @@
 
 NIST 将云计算分为了三种服务模型。
 
-这三种服务模型分别是基础设施即服务（Infrastructure as a Service，IaaS）、平台即服务（Platform as a Service，PaaS）以及软件即服务（Software as a Service，SaaS）。IaaS为消费者提供用来运行应用的计算资源，包括服务器、存储、网络等。其中虚拟机是云厂商提供的最核心的IaaS产品。与IaaS只提供最基础的底层资源不同，PaaS强调为消费者提供云开发环境，除计算资源以外，PaaS为用户提供中间件开发，运行平台及工具，帮助用户更方便地开、管理、测试和运行应用。SaaS是厂商提供的基于云的软件，用户无需下载安装软件，通过浏览器即可访问服务。
+这三种服务模型分别是基础设施即服务（Infrastructure as a Service，IaaS）、平台即服务（Platform as a Service，PaaS）以及软件即服务（Software as a Service，SaaS）\parencite{mell2011the}。IaaS为消费者提供用来运行应用的计算资源，包括服务器、存储、网络等。其中虚拟机是云厂商提供的最核心的IaaS产品。与IaaS只提供最基础的底层资源不同，PaaS强调为消费者提供云开发环境，除计算资源以外，PaaS为用户提供中间件开发，运行平台及工具，帮助用户更方便地开、管理、测试和运行应用。SaaS是厂商提供的基于云的软件，用户无需下载安装软件，通过浏览器即可访问服务。
 
 图\ref{rep_products}给出了云计算三种服务模型的代表产品。亚马逊公司的AWS EC2\parencite{awsec2}，谷歌公司的Google Compute Engine\parencite{googlecloud}以及阿里云公司的ECS\parencite{aliecs}都是典型的IaaS产品。其主要服务形态是云厂商向消费者售卖虚拟机或者裸金属服务器以及连带的网络、存储等附属产品。PaaS的代表性产品包括AWS Beanstalk、Google App Engine、Microsoft Azure App Servics等。此类产品为用户提供在云中快速部署和管理应用的能力，提供包括应用扩容，负载均衡，应用监控和安全管理等功能。相比于IaaS仅售卖以虚拟机为主的基础设施，PaaS降低了用户开发、管理、运维应用的成本，使得用户可以更加专注于构建应用本身。在云计算已经发展了十几年的当今时代，越来越多的SaaS产品涌现了出来。谷歌公司开发的Google Docs、Google Maps以及微软公司开发的Microsoft Office 365都是典型的SaaS产品。以Google Docs为例，与传统的文件处理办公软降相比，用户无需在本地花费大量存储空间来安装软件，只需要打开浏览器，输入URL，即可使用Google Docs服务处理文件，并且所有的文件都会被及时同步保存到云端。另一个代表性的SaaS产品是Google Maps。Google Maps与Google Docs类似，为个人用户提供在浏览器中直接使用的地图服务。与传统软件相比，SaaS在使用方式上具有方便灵活，跨平台的特性，同时用户存储在云端的数据经过云厂商的冗余备份也具有更高的可靠性。
 
