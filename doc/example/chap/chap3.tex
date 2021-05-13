@@ -124,7 +124,7 @@ H. Zhao等人在2020年提出了HiveD\parencite{zhao2020hived}，使用Virtual P
     \label{convgpu_arch}
 \end{figure}
 
-在容器环境中基于API转发的方式和上图类似。D. Kang等人在2017年提出了ConVGPU\parencite{kang2017convgpu}，通过在docker容器中安插一个CUDA wrapper来对一些与GPU显存相关的API（例如cudaMelloc，cudaFree等）进行截获，并实现了一个管理全局显存分配的调度模块。如图~\ref{convgpu_arch}，ConVGPU实际上是以一个中间件的形式存在于容器环境中的。在正常的API调用路径下，插入一个显存管理的组件，在软件层面实现了GPU显存的共享和一定程度上的隔离。
+在容器环境中基于API转发的方式和上图类似。D. Kang等人在2017年提出了ConVGPU\parencite{kang2017convgpu}，通过在docker\parencite{merkel2014docker}容器中安插一个CUDA wrapper来对一些与GPU显存相关的API（例如cudaMelloc，cudaFree等）进行截获，并实现了一个管理全局显存分配的调度模块。如图~\ref{convgpu_arch}，ConVGPU实际上是以一个中间件的形式存在于容器环境中的。在正常的API调用路径下，插入一个显存管理的组件，在软件层面实现了GPU显存的共享和一定程度上的隔离。
 
 而更多的GPU共享的解决方案是与具体的应用场景高度绑定的，尤其是在运行机器学习任务的集群中。W. Xiao等人在2018年提出了Gandiva\parencite{xiao2018gandiva}，主要面向深度学习集群中基于GPU的模型训练任务进行调度。有别于传统的suspend/resume机制，Gandiva使用grow/shrink机制。图~\ref{gandiva_grow_shrink}表现了Gandiva的grow-shrink机制。Gandiva中主要存在如下三种动作：1）grow。即当前如果存在空闲的资源，Gandiva会让存在空闲资源的节点上的某些任务占用的资源拓展到空闲资源上，以提升系统的资源利用率和模型的训练速度（如图~\ref{gandiva_grow_shrink}中的Gandiva:(3) Grow-shrink）。2）shrink。当系统中有新的训练任务到达时，Gandiva一般不会将一个任务直接shutdown，而是将其所占用的资源进行裁剪，腾出新的资源以供新的任务所用（如图~\ref{gandiva_grow_shrink}中的Gandiva:(3) Grow-shrink）。3）migration。当系统其它节点中存在空闲资源时，Gandiva会将一个非独占的任务迁移到该空闲资源上（如图~\ref{gandiva_grow_shrink}中的Gandiva:(2) Migration）。值得注意的是，Gandiva在实验中发现，深度学习任务的显存占用一般呈周期性涨落的趋势，其峰值显存占用率和谷值显存占用率差距非常大。因此其在迁移任务时会根据任务占用显存的变化趋势，在任务占用显存最小的时候对任务进行迁移，以降低迁移产生的额外开销。
 
