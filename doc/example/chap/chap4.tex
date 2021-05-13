@@ -61,7 +61,20 @@ Ernest虽然可以达到较好的效果，但是其仅针对Hadoop和Spark等MR�
 
 随着深度学习模型的流行，也有研究者提出使用深度学习模型对应用性能进行建模，从而为应用选择最合适的云资源。F. Moradi\parencite{moradi2019performance}在2019年提出使用迁移学习算法实现通用的云应用性能预测。该方法先使用一个应用程序在所有的云配置上运行并收集性能数据，然后用深度神经网络对其建立性能模型，并将该模型计作基础模型。当需要为新的应用程序预测性能时，则抽出基础模型中的前若干层中的已训练参数放在新模型中，并使用新应用程序在少量配置上预运行得到结果对该模型进行微调，从而得到一个模型。该方法实际上是将已训练好的模型视作应用程序的特征抽取器，再使用其抽取的特征在新的数据上重新训练得到新模型。
 
-基于上述工作，后续也有若干工作尝试在不同的应用场景下解决配置优化问题，但是总体上的方法皆大同小异。
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/arch_v2.pdf}}
+    \caption{基于Domain Adaption的性能预测。}
+    \label{li_jcc_arch}
+\end{figure}
+
+Y. Li等人\parencite{li2020cross}也提出了一种基于迁移学习的性能预测算法。如图~\ref{li_jcc_arch}所示，不同于F. Moradi等人的工作，该工作并未采用重新训练的方法，而是使用特征迁移的方法，直接将训练得到的模型在新的场景中应用。该思想借鉴于计算机视觉中的CORAL模型（covariance alignment)\parencite{sun2017correlation}，先通过计算source domain和target domain的协方差矩阵，然后利用公式~\ref{eq_coral}得到一个转移矩阵，最后利用该转移矩阵对target domain的特征做线性变换，应用于在source domain中训练得到的模型得到当前应用程序在不同配置上的性能。
+
+\begin{equation}\label{eq_coral}
+	\begin{aligned}
+		A_{ti}^{(S)} = &\operatorname{argmin}_B||\bar{\Sigma_s} - B^T\Sigma_{ti}B||_2 \\
+		&s.t.\ \bar{\Sigma_s} = \frac{1}{|S|}\sum_{s \in S}\Sigma_s
+	\end{aligned}
+\end{equation}
 
 \subsection{基于搜索的线上优化方法}
 该类方法不同于数据驱动的线下建模方法，不需要在线下建立性能模型。其一般使用相关搜索算法（例如贝叶斯优化）在线上不断地搜索，并同时更新一个置信函数，当该函数值大于（或小于）某个阈值时，便停止搜索，用当前的到的数据中最优的一个作为结果。作为无需线下建模的纯线上方法，其固然具有其方便性。但是由于其掌握的信息过少，准确性一般要比基于线下建模的方式略低。
@@ -113,7 +126,9 @@ F. Li等人在2019年提出了DeepJS\parencite{li2019deepjs}，将问题模型�
     \label{neo_arch}
 \end{figure}
 
-受到Decima的启发，有一些学者开始考虑将深度学习算法和图神经网络应用到云数据库中的查询优化中，因为数据库中的一次查询所对应的语法树天生就是一个DAG图，图的节点对应数据库中的operator。R. Marcus等人在2019年提出Neo\parencite{marcus2019neo}，一种基于深度学习的数据库查询优化器。图~\ref{neo_arch}阐述了Neo的系统架构。与~\ref{sec_profling}中所述的基于线下模型训练的性能预测方法类似，Neo需要先使用sample workload，通过一个已有的最优优化器（可能是基于专家的经验，也可能基于历史信息），构建一个查询优化的信息库（即图中的Experience）。当用户发起查询时，Neo中的特征提取器会结合经验和用户的查询语句对其进行特征提取。此处的特征提取Neo使用了树形的卷积网络对语句中的operator进行编码，然后做出决策，交由数据库引擎执行。T. Kraska在2019年也提出了一个基于深度学习的数据库系统SageDB\parencite{47669}。和Neo相比，SageDB更进一步，其在数据库查询执行、数据预取等阶段都利用机器学习模型做了相关优化
+受到Decima的启发，有一些学者开始考虑将深度学习算法和图神经网络应用到云数据库中的查询优化中，因为数据库中的一次查询所对应的语法树天生就是一个DAG图，图的节点对应数据库中的operator。R. Marcus等人在2019年提出Neo\parencite{marcus2019neo}，一种基于深度学习的数据库查询优化器。图~\ref{neo_arch}阐述了Neo的系统架构。与~\ref{sec_profling}中所述的基于线下模型训练的性能预测方法类似，Neo需要先使用sample workload，通过一个已有的最优优化器（可能是基于专家的经验，也可能基于历史信息），构建一个查询优化的信息库（即图中的Experience）。当用户发起查询时，Neo中的特征提取器会结合经验和用户的查询语句对其进行特征提取。此处的特征提取Neo使用了树形的卷积网络对语句中的operator进行编码，然后做出决策，交由数据库引擎执行。T. Kraska在2019年也提出了一个基于深度学习的数据库系统SageDB\parencite{47669}。和Neo相比，SageDB更进一步，其在数据库查询执行、数据预取等阶段都利用机器学习模型做了相关优化。
+
+除了数据库领域，深度强化学习也被应用于其它系统软件领域。例如，L. Cen等人\parencite{cen2020learned}在2020年提出基于深度强化学习的垃圾回收优化机制。在Java，Python等语言中，垃圾回收是内存管理机制的重要组成部分。Cen等人利用深度强化学习，专门针对长运行的任务（例如Web服务），在其运行过程中不断地利用强化学习算法优化垃圾回收策略，动态地决定何时对内存对象进行回收，以提升服务的质量或者任务的性能。
 
 \section{小结}
 
