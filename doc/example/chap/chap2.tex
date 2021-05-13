@@ -97,11 +97,11 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
 
 \textbf{Linear Learner. }即线性回归模型，一般用来解决回归或者分类问题。在Sagemaker中，其支持使用随即梯度下降（SGD）来训练一个线性模型。特别地，Sagemaker还支持对一个模型指定不同的目标函数，并且并行地训练其对应的多个模型。
 
-\textbf{Factorization Machines (FM). }\parencite{rendle2010factorization}FM常用于推荐系统中很多任务（例如CTR预估），是一种适用于分类和回归任务的更为通用的监督学习算法。FM是对线性模型的一种拓展，考虑了高维稀疏数据集中不同特征之间的关联。在Sagemaker中，FM也是通过SGD来进行训练的。
+\textbf{Factorization Machines (FM)\parencite{rendle2010factorization}. }FM常用于推荐系统中很多任务（例如CTR预估），是一种适用于分类和回归任务的更为通用的监督学习算法。FM是对线性模型的一种拓展，考虑了高维稀疏数据集中不同特征之间的关联。在Sagemaker中，FM也是通过SGD来进行训练的。
 
-\textbf{K-Means Clustering. }\parencite{jain2010data}K-Means聚类是一类无监督学习算法，可以将一个数据集聚为K个不同的类别。Sagemaker实现了一个流式计算版本的K-means，综合运用了来自随机优化、核心集和在线选址问题的思想。
+\textbf{K-Means Clustering\parencite{jain2010data}. }K-Means聚类是一类无监督学习算法，可以将一个数据集聚为K个不同的类别。Sagemaker实现了一个流式计算版本的K-means，综合运用了来自随机优化、核心集和在线选址问题的思想。
 
-\textbf{Principal Component Analysis (PCA). }\parencite{tenenbaum2000a}即主成分分析，是一种通过尽可能保留数据集的方差来对数据进行降维的算法。Sagemaker实现了两种PCA算法。第一类是准确型的，通过适量的采样和特征提取，需要$O(d^2)$量级的内存大小。另一种是粗略型的，通过随即投影来减小内存开销到$O(kd)$。这里$k$和$d$分别代表主成分的个数和数据的维度。
+\textbf{Principal Component Analysis (PCA).\parencite{tenenbaum2000a} }即主成分分析，是一种通过尽可能保留数据集的方差来对数据进行降维的算法。Sagemaker实现了两种PCA算法。第一类是准确型的，通过适量的采样和特征提取，需要$O(d^2)$量级的内存大小。另一种是粗略型的，通过随即投影来减小内存开销到$O(kd)$。这里$k$和$d$分别代表主成分的个数和数据的维度。
 
 \textbf{Neural Topic Models (NTM). }在Sagemaker中，NTM是一种用来在大型离散数据集中抽取latent representation的无监督学习算法，例如抽取文档中的语料库。为了实现更快的推理，NTM是基于variational autoencoder（VAE）模型实现的。
 
@@ -110,7 +110,7 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
 \subsubsection{实现方式}
 经济和高效是云用户总是在关心的两类问题。Sagemaker为了满足这样的用户需求，充分利用了其底层的异构资源池，并通过上层的系统软件使得机器学习可以在成百上千台VM上横向拓展。
 
-\textbf{在新硬件上运行ML任务。}
+\textbf{在异构硬件上运行ML任务。}
 为了实现在异构的资源上（主要是CPU和GPU），Sagemaker中的大多数算法使用MXNet\parencite{chen2015mxnet}的库作为使用底层硬件的接口。MXNet通过一个张量算子构成的计算图来描述一个机器学习算法，同时通过将算子分配到具体的设备进行执行来实现并发地训练模型。
 
 \textbf{利用参数服务器模型（Parameter-Server Model，即PS Model）\parencite{186214}实现分布式训练和参数共享。}如图~\ref{sagemaker_ps}所示，在Sagemaker中，分布式训练就是通过参数服务器模型来实现的，且一般默认使用的是弱一致性的模式。同时，为了方便push和pull的操作，AWS实现了一个key-value的存储系统KVStore。

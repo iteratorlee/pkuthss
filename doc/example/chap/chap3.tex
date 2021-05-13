@@ -124,7 +124,7 @@ H. Zhao等人在2020年提出了HiveD\parencite{zhao2020hived}，使用Virtual P
     \label{convgpu_arch}
 \end{figure}
 
-在容器环境中基于API转发的方式和上图类似。D. Kang等人在2017年提出了ConVGPU\parencite{kang2017convgpu}，通过在docker容器中安插一个CUDA wrapper来对一些与GPU显存相关的API（例如cudamelloc，cudafree等）进行截获，并实现了一个管理全局显存分配的调度模块。如图~\ref{convgpu_arch}，ConVGPU实际上是以一个中间件的形式存在于容器环境中的。在正常的API调用路径下，插入一个显存管理的组件，在软件层面实现了GPU显存的共享和一定程度上的隔离。
+在容器环境中基于API转发的方式和上图类似。D. Kang等人在2017年提出了ConVGPU\parencite{kang2017convgpu}，通过在docker容器中安插一个CUDA wrapper来对一些与GPU显存相关的API（例如cudaMelloc，cudaFree等）进行截获，并实现了一个管理全局显存分配的调度模块。如图~\ref{convgpu_arch}，ConVGPU实际上是以一个中间件的形式存在于容器环境中的。在正常的API调用路径下，插入一个显存管理的组件，在软件层面实现了GPU显存的共享和一定程度上的隔离。
 
 而更多的GPU共享的解决方案是与具体的应用场景高度绑定的，尤其是在运行机器学习任务的集群中。W. Xiao等人在2018年提出了Gandiva\parencite{xiao2018gandiva}，主要面向深度学习集群中基于GPU的模型训练任务进行调度。有别于传统的suspend/resume机制，Gandiva使用grow/shrink机制。图~\ref{gandiva_grow_shrink}表现了Gandiva的grow-shrink机制。Gandiva中主要存在如下三种动作：1）grow。即当前如果存在空闲的资源，Gandiva会让存在空闲资源的节点上的某些任务占用的资源拓展到空闲资源上，以提升系统的资源利用率和模型的训练速度（如图~\ref{gandiva_grow_shrink}中的Gandiva:(3) Grow-shrink）。2）shrink。当系统中有新的训练任务到达时，Gandiva一般不会将一个任务直接shutdown，而是将其所占用的资源进行裁剪，腾出新的资源以供新的任务所用（如图~\ref{gandiva_grow_shrink}中的Gandiva:(3) Grow-shrink）。3）migration。当系统其它节点中存在空闲资源时，Gandiva会将一个非独占的任务迁移到该空闲资源上（如图~\ref{gandiva_grow_shrink}中的Gandiva:(2) Migration）。值得注意的是，Gandiva在实验中发现，深度学习任务的显存占用一般呈周期性涨落的趋势，其峰值显存占用率和谷值显存占用率差距非常大。因此其在迁移任务时会根据任务占用显存的变化趋势，在任务占用显存最小的时候对任务进行迁移，以降低迁移产生的额外开销。
 
@@ -186,11 +186,11 @@ SCONE和Ryoan等都是基于SGX在系统软件这个层次所做的工作，用�
 
 可信执行环境技术的实现离不开新的硬件支持。换言之，在支持可信执行环境的计算机上，操作系统管理除传统的CPU、内存、I/O等系统资源以外，还需要管理新型的特殊硬件资源。以Intel SGX为例，其使用了一种特殊的被称为EPC（Enclave Page Cache）的加密内存来运行代码和数据。以EPC为代表的新型硬件的出现给云原生共享集群的管理带来了挑战。共享集群通过让不同的分布式应用共享底层硬件资源来优化系统管理、提升集群资源利用率。“共享”意味着管理系统需要基于虚拟化等技术手段来对资源进行抽象和隔离，防止不同应用程序在共享硬件资源时因竞争而产生相互干扰，导致性能下降甚至是程序崩溃等问题。
 
-对于传统的CPU、内存、I/O等硬件资源，当前的操作系统已具备成熟的机制（如容器）对其进行隔离。共享集群管理系统也依赖于操作系统的这种能力来完成资源分配、变更和调度。但遗憾的是，当前的操作系统虚拟化和隔离可信执行环境所依赖的新型硬件资源的能力还较为有限，这给云原生共享集群在利用这些资源时带来了挑战。以现有的共享集群管理系统为例，YARN尽管提出了容器的概念用以进行资源划分和分配，但那只是一种逻辑的抽象，在实际运行时，YARN并没有将任务封装在LXC、Docker之类的操作系统虚拟化容器中。在早期的版本中，YARN只对内存这单一维度的资源进行限制。当YARN启动一个任务时，同时还会启动一个监控器对任务进程的内存消耗进行监控。当任务进程消耗的内存超过任务申请的内存时，YARN会将该任务终止。而对于如CPU之类的其他资源，尽管用户在提交作业时也会为每个任务指定申请的资源配额，但这些信息仅仅会被用来进行调度决策，YARN不会对这些资源进行限制。因此，一个指定了1个CPU核数的任务在机器较为空闲时可能会使用超过1个CPU核数的资源。随着时间的发展，在后续版本中，YARN引入了cgroups机制，通过cgroups实现了对CPU、I/O等资源的限制。
+对于传统的CPU、内存、I/O等硬件资源，当前的操作系统已具备成熟的机制（如容器）对其进行隔离。共享集群管理系统也依赖于操作系统的这种能力来完成资源分配、变更和调度。但遗憾的是，当前的操作系统虚拟化和隔离可信执行环境所依赖的新型硬件资源的能力还较为有限，这给云原生共享集群在利用这些资源时带来了挑战。以现有的共享集群管理系统为例，YARN\parencite{vavilapalli2013apache}尽管提出了容器的概念用以进行资源划分和分配，但那只是一种逻辑的抽象，在实际运行时，YARN并没有将任务封装在LXC、Docker之类的操作系统虚拟化容器中。在早期的版本中，YARN只对内存这单一维度的资源进行限制。当YARN启动一个任务时，同时还会启动一个监控器对任务进程的内存消耗进行监控。当任务进程消耗的内存超过任务申请的内存时，YARN会将该任务终止。而对于如CPU之类的其他资源，尽管用户在提交作业时也会为每个任务指定申请的资源配额，但这些信息仅仅会被用来进行调度决策，YARN不会对这些资源进行限制。因此，一个指定了1个CPU核数的任务在机器较为空闲时可能会使用超过1个CPU核数的资源。随着时间的发展，在后续版本中，YARN引入了cgroups机制，通过cgroups实现了对CPU、I/O等资源的限制。
 
 因为YARN启动任务就是启动进程，如果想在YARN中运行SGX任务，只需在集群节点上安装好SGX驱动程序等相关环境即可。但当前的YARN缺少接收任务使用EPC资源需求的接口，因此YARN在调度时不会考虑SGX作业需要使用多少EPC资源。进一步地，YARN缺乏隔离EPC的能力，因此调度到同一台机器上的两个SGX程序会竞争EPC使用，导致程序性能下降。
 
-与YARN 相比，Kubernetes管理和编排的是以Docker为代表的操作系统虚拟化容器。也就是说，在Kubernetes中，任务进程都是运行在Docker容器里的。对于SGX任务而言，如果想要以Docker的形式运行，需要将主机上的\textit{isgx}设备文件映射到容器里。在Kubernetes里运行SGX任务则更复杂一些，需要使Kubernetes具备管理EPC的能力。
+与YARN 相比，Kubernetes\parencite{bernstein2014containers}管理和编排的是以Docker为代表的操作系统虚拟化容器。也就是说，在Kubernetes中，任务进程都是运行在Docker容器里的。对于SGX任务而言，如果想要以Docker的形式运行，需要将主机上的\textit{isgx}设备文件映射到容器里。在Kubernetes里运行SGX任务则更复杂一些，需要使Kubernetes具备管理EPC的能力。
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=\textwidth]{figures/k8s-yaml.png}}
