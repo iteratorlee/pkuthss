@@ -1,7 +1,7 @@
 % Copyright (c) 2014,2016 Casper Ti. Vector
 % Public domain.
 
-\chapter{面向人工智能的云计算系统软件研究}
+\chapter{面向人工智能的云计算软件系统研究}
 % \pkuthssffaq % 中文测试文字。
 以深度学习为代表性技术的人工智能领域在21世纪10年代再度兴起，社会各界对于人工智能的需求也愈发旺盛。遍布超市和餐馆中的扫脸支付技术、智能手机上的语音智能助手、工厂中检测废件的自动检测装置等，都离不开人工智能技术的加持。上述场景都需要适当的机器学习模型在线部署以提供服务。
 
@@ -9,11 +9,13 @@
 
 为了方便开发者专注到模型的开发流程中，各大主流云厂商均实现了支持机器学习模型开发-调试-部署整个流程的软件栈。同时，云厂商提供的一般性的平台可能无法满足用户特定的需求。因此针对具体场景，学术界也提出了一系列基于云服务的机器学习软件，以达到降低开发成本、提高模型在线服务的质量等目标。本章对上述内容涉及到的相关工作展开具体研究。
 
-\section{公有云厂商提供的云上机器学习系统}
+\section{分布式机器学习系统的两种架构范式}
 
-本节先介绍公有云厂商机器学习系统所遵循的共同范式，即Parameter Server系统架构。再以AWS Sagemaker为代表，介绍公有云厂商一站式的云上机器学习系统的设计。其它厂商中类似系统中对计算模型的抽象、使用方式等均与Sagemaker大同小异。
+得益于云上近乎无限的资源，机器学习模型在云上的训练可以以分布式的形式展开，以加快训练效率。本节介绍分布式ML系统的两种架构范式：数据并行架构和模型并行架构。本章所述的所有系统，皆是遵循这两种架构范式来设计的。
 
-\subsection{Parameter Server架构}
+\subsection{数据并行架构}
+
+\subsubsection{Parameter Server架构}
 大模型的训练一般难以在单机上运行，需要分布式的环境将更多的算力和存储资源组织起来。A. Smola等人\parencite{smola2010an}在2010年为了解决大型自然语言处理模型的训练，提出来一种并行的分布式训练架构。在该架构中，模型的参数通过key-value的形式存储在一部分节点上，另一部分节点负责训练，同时在完成训练后将参数push到存储参数的节点上。该架构实际上就是后来业界流行的Parameter Server架构，即参数服务器架构（简称为PS Model），的雏形。
 
 此后类似的架构在产业界得到了广泛使用。直到2014年，M. Li等人\parencite{186214}在OSDI上发表论文，综合地描述了PS Model的设计和实现，并完善了PS Model的通信模型、参数同步和异步的push/pull模型、server节点的一致性模型。至此，PS Model实际上已经开始逐渐成为业界大型分布式机器学习系统的设计范式。
@@ -33,6 +35,33 @@ PS Model之所以能够高效，与其worker push和pull参数时的设计是密
     \caption{在参数服务器架构中使用梯度下降训练模型的流程。}
     \label{ps_sgd}
 \end{figure}
+
+\subsubsection{All-reduce架构}
+PS Model并非没有缺陷，事实上，当worker数目增加到一定数量时，worker与server之间的网络通信就会成为瓶颈，worker平均可以使用的带宽减少将会减少，集群中的通信复杂度与node的数量几乎是成线性的。为了解决这个问题，all-reduce架构应运而生。其中最为常用的是ring-allreduce。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/ring-allreduce.png}}
+    \caption{ring-allreduce示意图。}
+    \label{ring_allreduce}
+\end{figure}
+
+事实上，all-reduce并非机器学习系统中的新概念，而是从传统的高性能计算通用接口MPI\parencite{gropp1994using}中借鉴而来的。图~\ref{ring_allreduce}展示了ring-allreduce的数据流图。在ring-allreduce算法中，$N$个节点中的每个节点与其两个对等节点进行$2(N-1)$次通信。 在此通信期间，节点发送和接收数据缓冲区的块。 在前$N-1$次迭代中，将接收到的值添加到节点缓冲区中的值。 在第二批$N-1$次迭代中，接收到的值替换了节点缓冲区中保存的值。 先前的工作表明该算法是带宽最佳的，这意味着如果缓冲区足够大，它将最佳地利用可用的网络。
+
+在产业界，Horovod\parencite{sergeev2018horovod}和BytePS\parencite{jiang2020a}就是使用all-reduce架构开发的分布式机器学习系统。
+
+\subsection{模型并行架构}
+
+除了数据并行之外，另外一种分布式训练架构称为模型并行\parencite{jia2018data,huang2019gpipe}。顾名思义，该架构将模型拆分为多份分布在集群中的不同节点上，以流水线的方式对模型进行训练。图~\ref{model_para}展示了模型并行的工作流示意图。该类分布式架构常应用于两种场景下：1）大模型的训练或部署；2）在性能受限的节点上（例如边缘节点）训练或部署模型。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/gpipe-workflow.png}}
+    \caption{模型并行示意图。}
+    \label{model_para}
+\end{figure}
+
+\section{公有云厂商提供的云上机器学习系统}
+
+本节以AWS Sagemaker为代表，介绍公有云厂商一站式的云上机器学习系统的设计。其它厂商中类似系统中对计算模型的抽象、使用方式等均与Sagemaker大同小异。
 
 \subsection{AWS Sagemaker}\label{subsec_sagemaker}
 AWS作为公有云领域的先驱者，在云计算的前沿技术领域一直处于领先的地位。其某些代表性技术甚至成为了多数公有云厂商所共识的标杆和规范。在机器学习系统这一分领域，其代表性系统为AWS Sagemaker。
@@ -123,16 +152,16 @@ Sagemaker将机器学习训练的工作流抽象为三个阶段：initialize，u
 
 \textbf{模型抽象与参数表达。}Sagemaker在上层为用户提供了模型抽象和参数的表示方式。对于一个模型而言，有两个与其绑定的函数需要用户来实现：1）\textit{score}函数，为一个模型打分以衡量模型在该数据集的训练程度，在调试或者超参数调整阶段会被用到；2）\textit{evaluate}函数，接受一个batch的数据并计算该模型的输出。需要指明的是，对于不同的模型而言，输出的格式可能是不同的，例如对于分类问题，输出可能是一个label也可能是不同类别的概率。参数的表达方式同样需要统一的上层抽象。在Sagemaker中，不同类型的模型有着不同的表达形式。例如，K-means算法的模型就表现为一个核心集，因此，对于任意$k<k_{max}$，用户都无需重新训练模型，而是可以直接得到结果。对于K邻近算法，Sagemaker也有类似的设计。
 
-\begin{figure}[h]
-    \centerline{\includegraphics[width=\textwidth]{figures/sagemaker-architecture.png}}
-    \caption{Sagemaker训练、部署工作流。}
-    \label{sagemaker_train_serving}
-\end{figure}
+%\begin{figure}[h]
+%    \centerline{\includegraphics[width=\textwidth]{figures/sagemaker-architecture.png}}
+%    \caption{Sagemaker训练、部署工作流。}
+%    \label{sagemaker_train_serving}
+%\end{figure}
 
 \textbf{模型微调与超参数调整。}通常而言，一个超参数调整任务（Hyperparameter Tuning Optimization，即HPO）\parencite{bardenet2013collaborative}由多个并行的模型训练任务构成，这些训练任务每个都尝试一个不同的超参数组合，最后得到一个最优的配置。上述过程需要耗费大量计算资源和时间，对于寻常用户而言是非常耗时耗力的。而Sagemaker基于PS的计算模型设计保证了任意一个ML训练任务都可以随时启动和停止。这种机制使得模型微调和超参数调整变得更为容易操作：1）用户可以增量式地更新数据集，但却不用每次都重新训练模型，因为整个训练过程都是流式的；2）HPO可以同时启动多个训练任务，然后提前发现那些劣质的模型并将其终止，从而降低HPO的成本。
 
 \subsubsection{模型部署}
-作为一站式的机器学习系统，除了模型训练和调参，Sagemaker还支持模型部署。图~\ref{sagemaker_train_serving}展示了Sagemaker训练和部署模型的整体工作流。在部署时，首先，用户需要对其模型指定一个endpoint，然后将部署该模型的的代码打包成容器镜像，存储在EC2 Container Registry中。在模型实际对外提供服务时，模型文件会从对象存储S3中传输到容器中，进而以容器为单位对外提供服务。
+作为一站式的机器学习系统，除了模型训练和调参，Sagemaker还支持模型部署。在部署时，首先，用户需要对其模型指定一个endpoint，然后将部署该模型的的代码打包成容器镜像，存储在EC2 Container Registry中。在模型实际对外提供服务时，模型文件会从对象存储S3中传输到容器中，进而以容器为单位对外提供服务。
 
 \section{基于公有云服务的第三方机器学习系统}
 尽管公有云厂商实现了相当完备的一站式机器学习系统，但是随着生产环境中业务场景的日渐复杂，大而全的公有云解决方案已经无法解决个性化的用户需求。例如，某些用户希望以尽可能低的成本完成大型模型的训练，或者在保证模型服务的SLO前提下，能够尽可能低成本的部署机器学习模型。在上述场景中，为了完成用户的具体需求，需要综合利用各类云资源，并制定一定的策略。本节对近几年来几个构建于公有云资源上层的机器学习系统做具体介绍。
@@ -434,6 +463,16 @@ V. Ishakian等人\parencite{ishakian2018serving}在2018年在AWS Lambda上基于
 \end{figure}
 
 值得一提的是，INFaaS称其模型部署方式为model-less的，并不意味着模型（即model）在其系统中不存在。和serverless中用户无需关注后端服务器类似，model-less意味着用户无需关注其请求到底是由系统中的那个模型变体实际为其服务的。事实上，可以认为model-less是更上一层的serverless的部署方式，因为用户不仅不需要关注后端到底存不存在服务器，甚至都不需要关注后端的模型到底是什么。
+
+上述工作关注的都是较小的模型（即单个Function实例可以容纳下的模型）。然而随着算法的迭代发展，效果较好的深度学习模型动辄数GB甚至数10GB，FaaS实例的内存和磁盘空间难以容纳。近年也有学者探究如何利用FaaS部署大型模型。M. Yu等人在2021年提出了Gillis~\parencite{yu2021gillis}，试图通过模型并行的方式在FaaS环境下部署大型模型。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/gillis-arch.png}}
+    \caption{Gillis系统架构图。}
+    \label{gillis_arch}
+\end{figure}
+
+图~\ref{gillis_arch}展示了Gillis的工作流及其fork-join模型。Gillis是一个基于模型分割的FaaS-ML部署系统，旨在支持大型模型在FaaS环境中的serving。Gillis中的server和worker同样是函数实例。不同的是，在每次request响应之前，其会将模型分割为多个碎片，分布在所有worker实例上。在一个调度周期结束后，Gillis会根据当前的系统状态，通过强化学习模型决定下个调度周期的模型分割策略，使性能逐渐趋向于最优。很显然，Gillis遵循了前文所述的两种范式中的模型并行范式。
 
 从基于云上VM，到多种服务混用，再到纯FaaS，公有云上的模型部署正在一步一步地向简洁高效发展。从云的角度理解，这是一种云原生的发展方式，即云上的模型部署依赖于云本身的能力，生在云上长在云上，将弹性伸缩、容错、高并发等工作交由云商或者第三饭服务来做，开发者或者用户只需要关注与业务本身相关的代码逻辑，即“将麻烦留给云商，将方便带给用户”。
 
