@@ -233,17 +233,15 @@ BidBrain是Proteus中的资源管理模块，决定何时获取和释放动态�
 
 AgileML的具体功能和技术特点，下文通过一个示例来说明。图~\ref{agileml_stages}描述了AgileML架构中的三个阶段，分别对应不同的资源类型比例。
 
-\textbf{Stage 1:参数服务器仅位于可靠节点上。}此阶段为整个ML训练过程的启动阶段。对于大多数ML的应用程序而言（例如K-means，DNN，Logistic Regression，MF，LDA等），其在PS模型的场景下worker节点是无状态的，其当前轮次更新的参数数据会push到server节点进行持久化存储。因此，在启动时，AgileML会将所有的server节点部署到可靠资源上，而将所有的worker节点部署到动态资源上。在这种情形下，当worker因为云厂商的主动回收而宕机时，整个训练过程并不会受到影响，也不需要进行checkpointing。但是在模式下，当动态资源与可靠资源相比比例过于悬殊时，网络会成为瓶颈。例如当存在60个动态节点和4个可靠节点时，MF的训练速度会下降85%。
-
-\textbf{Stage 2:ActivePSs部署在动态节点上，BackupPSs部署在可靠节点上。}为了解决Stage 1中的网络瓶颈问题，Stage 2中将server节点分为ActivePS和BackupPS两种，其中ActivePS分布在动态资源上，BackupPS分布在可靠资源上。这种策略合理控制了server节点和worker节点的比例，解决了网络的瓶颈问题。所有的参数在ActivePS内部是共享的，并且在后台批量地push到BackupPS上，因此当ActivePS因厂商主动回收而宕机时，BackupPS可以恢复其相关状态，并启动新的动态节点。需要注意的是，在Stage 2中，计算节点，即worker，仍然存在于ActivePS上。
+\textbf{Stage 1:参数服务器仅位于可靠节点上。}%此阶段为整个ML训练过程的启动阶段。对于大多数ML的应用程序而言（例如K-means，DNN，Logistic Regression，MF，LDA等），其在PS模型的场景下worker节点是无状态的，其当前轮次更新的参数数据会push到server节点进行持久化存储。因此，在启动时，AgileML会将所有的server节点部署到可靠资源上，而将所有的worker节点部署到动态资源上。在这种情形下，当worker因为云厂商的主动回收而宕机时，整个训练过程并不会受到影响，也不需要进行checkpointing。但是在模式下，当动态资源与可靠资源相比比例过于悬殊时，网络会成为瓶颈。例如当存在60个动态节点和4个可靠节点时，MF的训练速度会下降85%。
+\textbf{Stage 2:ActivePSs部署在动态节点上，BackupPSs部署在可靠节点上。}%为了解决Stage 1中的网络瓶颈问题，Stage 2中将server节点分为ActivePS和BackupPS两种，其中ActivePS分布在动态资源上，BackupPS分布在可靠资源上。这种策略合理控制了server节点和worker节点的比例，解决了网络的瓶颈问题。所有的参数在ActivePS内部是共享的，并且在后台批量地push到BackupPS上，因此当ActivePS因厂商主动回收而宕机时，BackupPS可以恢复其相关状态，并启动新的动态节点。需要注意的是，在Stage 2中，计算节点，即worker，仍然存在于ActivePS上。
+\textbf{Stage 3:所有的计算节点，即worker都位于动态节点上。}%实验证明，当动态资源和可靠资源的比例超过15:1时，和BackupPS共同部署的worker会造成“落后者效应”（即Straggler Effect）。因此，Stage 3中简单地移除了所有位于BackupPS中的worker。何时由Stage 2转移到Stage 3，依赖于网络带宽，动态资源和可靠资源地比例以及ML模型的大小等等。
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=\textwidth]{figures/stage-trans.png}}
     \caption{AgileML动态地添加并删除资源。}
     \label{stage_trans}
 \end{figure}
-
-\textbf{Stage 3:所有的计算节点，即worker都位于动态节点上。}实验证明，当动态资源和可靠资源的比例超过15:1时，和BackupPS共同部署的worker会造成“落后者效应”（即Straggler Effect）。因此，Stage 3中简单地移除了所有位于BackupPS中的worker。何时由Stage 2转移到Stage 3，依赖于网络带宽，动态资源和可靠资源地比例以及ML模型的大小等等。
 
 上述三个stage之间的转移一般是由AgileML根据动态资源和可靠资源之间的比例动态决定的。当发生阶段转移时，AgileML会根据实际情况做出相应的动作。例如，当从Stage 1转移到Stage 2时，AgileML会将模型的状态（一般是模型的参数）转移到新增的动态资源上，当动态资源和可靠资源的比例超过一个阈值时，AgileML会将相应的worker在BackupPS上删除，并将相关的训练数据重新分布到其余worker上。图~\ref{stage_trans}所示的是一个stage转移的示例。
 
@@ -296,7 +294,7 @@ SpotTune之所以能做到经济高效，是由Provisioner和Orchestrator中的R
 \end{figure}
 
 
-另一方面，SpotTune认为每个ML训练任务的曲线都可以使用一个分段函数进行建模，并利用其部分数据来拟合整个曲线实际的形状，进而预测曲线的最终走势。图~\ref{lr_res56_loss}展示了两种ML任务的训练曲线，都呈现出明显的反比例特征和阶段性特征（通常而言，阶段性的特征一般是由学习率的突变导致的）。且第一张图显示可以通过部分的曲线形状来预测最终的曲线走势，进而提前淘汰一部分模型。EarlyCurve将每个ML训练任务按照公式~\ref{eq_curve_fitting}进行建模，通过当前收集到的部分数据将其拟合为一个分段函数。
+另一方面，SpotTune认为每个ML训练任务的曲线都可以使用一个分段函数进行建模，并利用其部分数据来拟合整个曲线实际的形状，进而预测曲线的最终走势。事实上，类似的训练趋势预测方法在多个相关工作中都曾被使用过，例如Optimus\parencite{peng2018optimus}和SLAQ\parencite{zhang2017slaq}。图~\ref{lr_res56_loss}展示了两种ML任务的训练曲线，都呈现出明显的反比例特征和阶段性特征（通常而言，阶段性的特征一般是由学习率的突变导致的）。且第一张图显示可以通过部分的曲线形状来预测最终的曲线走势，进而提前淘汰一部分模型。EarlyCurve将每个ML训练任务按照公式~\ref{eq_curve_fitting}进行建模，通过当前收集到的部分数据将其拟合为一个分段函数。
 
 \begin{equation}\label{eq_curve_fitting}
 	\hat{\mathcal{L}_k} = \sum_{i=1}^{ST}(\frac{1}{\alpha_{i0} \cdot k^2 + \alpha_{i1} \cdot k + \alpha_{i2}} + \alpha_{i3}) \cdot sign(k, l_i, r_i)
@@ -311,12 +309,6 @@ SpotTune之所以能做到经济高效，是由Provisioner和Orchestrator中的R
 \end{figure}
 
 图~\ref{example_spottune}给出了SpotTune的一个示例工作流程。在该流程中，一个HPT任务被启动的第一小时就被回收，因此第一小时的算力对于SpotTune而言是免费的。后面该模型再次被调度之后运行超过了一小时，因此被SpotTune主动停止，并再次被调度到别的实例上。最终，当任务完成度为$\theta$时，SpotTune判断其是否是一个优秀的模型，如果是的话将继续训练直到结束，否则其占用的计算资源将被直接释放掉。
-
-\begin{figure}[h]
-    \centerline{\includegraphics[width=\textwidth]{figures/data-para-faas-ml.png}}
-    \caption{基于PS架构的serverless ML系统。}
-    \label{data_para_faas_ml}
-\end{figure}
 
 SpotTune通过利用云上的动态资源，辅以一定的资源选取策略和ML训练过程预测算法，使得HPT可以在云上经济高效的运行。与Proteus类似，该类系统常常将成本放在系统设计的首位。云计算以其pay-as-you-go的使用模型俘获了大量用户，然而大到企业用户，小到个人用户，往往都会将成本放在首位，因为在云上获得的任何算力都会直接或间接地转化为经济开销，对于机器学习这种耗费算力的场景更是如此。正因为这样场景的普遍性存在，类似Proteus和SpotTune的基于云商服务进行二次开发的第三方系统才层出不穷。
 
@@ -333,6 +325,12 @@ SpotTune通过利用云上的动态资源，辅以一定的资源选取策略和
 \textbf{3. 生命周期短且启动时间不稳定。}Serverless函数一般是为在线的service设计的，因此其生命周期天然较短。同时其启动时间不稳定，例如AWS Lambda的启动时间甚至最长可以达到一分钟。因此，基于serverless computing的ML系统必须能够很好的处理频繁的函数启停。
 
 \textbf{4. 缺少快速的共享存储支持。}为了解决函数之间无法通信的问题，共享存储是一种常用的手段。但目前云环境中支持serverless使用的共享存储仅限于对象存储、数据库等SaaS服务，其响应延时、吞吐量等仍然无法与数据中心环境中的共享内存相比。
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=\textwidth]{figures/data-para-faas-ml.png}}
+    \caption{基于PS架构的serverless ML系统。}
+    \label{data_para_faas_ml}
+\end{figure}
 
 L. Feng等人\parencite{feng2018exploring}在2018年提出了一种简单的基于serverless的ML训练框架，其系统仍然采用PS作为主要框架。为了解决不同函数之间无法直接通信的问题，其采用云数据库作为中间存储层，使得不同的函数实例通过共享存储的方式进行通信。这一思想类似操作系统中进程间通信（IPC）的实现方式之一，即共享内存。图~\ref{data_para_faas_ml}描绘了该系统的架构图。其PS架构中的server和worker的实体都是函数。由于云数据库本身没有对参数进行聚集、更新、分发的能力，其server函数实际上负责参数的push和pull操作，数据的实际存储位置还是在数据库中。
 
